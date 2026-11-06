@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PasarKita</title>
+<link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div id="sidebarScrim"></div>
+  <main class="main">
+    <header class="topbar" id="topbar"></header>
+    <div class="content">
+      <div class="card no-print">
+        <div class="row">
+          <label for="eventSelect" style="margin:0">Event</label>
+          <select id="eventSelect" style="max-width:380px"></select>
+          <button class="btn" id="genBtn">Generate report</button>
+          <button class="btn btn-ghost" id="printBtn" disabled>Print report</button>
+        </div>
+      </div>
+      <div id="report"><div class="empty-card">Choose an event and click <b>Generate report</b>.</div></div>
+    </div>
+  </main>
+</div>
+
+<script src="/assets/js/sprites.js"></script>
+<script src="/assets/js/api.js"></script>
+<script src="/assets/js/layout.js"></script>
+<script>
+  let currentEventId = null;
+
+  (async () => {
+    await Layout.init({ role: 'organizer', page: 'reports', title: 'Reports' });
+    const events = await api('/events/all');
+    const sel = document.getElementById('eventSelect');
+    if (!events.length) { sel.innerHTML = '<option>No events yet</option>'; document.getElementById('genBtn').disabled = true; return; }
+    sel.innerHTML = events.map((e) => `<option value="${e.event_id}">${esc(e.name)} · ${esc(fmtDate(e.event_date))}${e.phase === 'ongoing' ? ' (today)' : ''}</option>`).join('');
+    const today = events.find((e) => e.phase === 'ongoing');
+    if (today) sel.value = today.event_id;
+  })();
+
+  // UC6 Generate Reports
+  document.getElementById('genBtn').onclick = (ev) => busy(ev.currentTarget, async () => {
+    try {
+      const id = document.getElementById('eventSelect').value;
+      render(await api(`/reports/${id}/generate`));
+      currentEventId = id;
+      document.getElementById('printBtn').disabled = false;
+    } catch (e) { toast(e.message, 'error'); }
+  });
+
+  // UC7 Print Reports («extend» Generate Reports)
+  document.getElementById('printBtn').onclick = async () => {
+    try {
+      render(await api(`/reports/${currentEventId}/print`));
+      setTimeout(() => window.print(), 100);
+    } catch (e) { toast(e.message, 'error'); }
+  };
+
+  function render(r) {
+    const e = r.event;
+    const tile = (v, l) => `<div class="stat"><div class="stat-value">${v}</div><div class="stat-label">${l}</div></div>`;
+    const pct = r.lots.total ? Math.round((r.lots.taken / r.lots.total) * 100) : 0;
+    document.getElementById('report').innerHTML = `
+      <div class="card">
+        <div class="print-only"><h2>PasarKita · Event Report</h2></div>
+        <div class="card-head"><div><h2>${esc(e.name)}</h2>
+          <div class="muted small">${esc(fmtDate(e.event_date))} · ${fmtTime(e.start_time)}–${fmtTime(e.end_time)} · ${esc(e.location)}</div></div>
+          ${badge(e.phase)}</div>
+        <div class="small muted">Generated ${esc(fmtDateTime(r.generatedAt))}${r.printedAt ? ` · Printed ${esc(fmtDateTime(r.printedAt))}` : ''}</div>
+      </div>
+      <div class="stat-grid">
+        ${tile(`${r.lots.taken}/${r.lots.total}`, `Lots taken (${pct}%)`)}
+        ${tile(money(r.payments.verified_amount), 'Verified payments')}
+        ${tile(r.payments.pending, 'Payments waiting')}
+        ${tile(r.applications.pending, 'Applications waiting')}
+        ${tile(r.applications.attending, 'Vendors confirmed attending')}
+        ${tile(r.helperRequests.total, 'Helper requests')}
+      </div>
+      <div class="grid-3">
+        <div class="card"><h3>Applications</h3><dl class="kv">
+          <dt>Accepted</dt><dd>${r.applications.accepted}</dd><dt>Waiting</dt><dd>${r.applications.pending}</dd>
+          <dt>Rejected</dt><dd>${r.applications.rejected}</dd><dt>Cancelled</dt><dd>${r.applications.cancelled}</dd></dl></div>
+        <div class="card"><h3>Payments</h3><dl class="kv">
+          <dt>Verified</dt><dd>${r.payments.verified}</dd><dt>Waiting</dt><dd>${r.payments.pending}</dd>
+          <dt>Rejected</dt><dd>${r.payments.rejected}</dd><dt>Expected</dt><dd>${money(r.lots.taken_value)}</dd></dl></div>
+        <div class="card"><h3>Requests</h3><dl class="kv">
+          <dt>Helpers</dt><dd>${r.helperRequests.assigned} assigned, ${r.helperRequests.pending} waiting, ${r.helperRequests.completed} done</dd>
+          <dt>Relocations</dt><dd>${r.relocations.approved} approved, ${r.relocations.pending} waiting</dd>
+          <dt>Attendance</dt><dd>${r.applications.attending} yes, ${r.applications.not_attending} no, ${r.applications.unconfirmed} unknown</dd></dl></div>
+      </div>
+      <div class="card"><h3>Vendor list</h3>
+        ${r.vendors.length ? `<div class="table-wrap"><table class="table">
+          <thead><tr><th>Lot</th><th>Vendor</th><th>Sells</th><th>Phone</th><th>Attendance</th><th>Arrival</th><th>Payment</th></tr></thead>
+          <tbody>${r.vendors.map((v) => `<tr><td><b>${esc(v.lot_number || '-')}</b><div class="small muted">${esc(v.zone || '')}</div></td>
+            <td>${esc(v.vendor_name)}</td><td>${esc(v.goods_type || '-')}</td><td>${esc(v.contact_number)}</td>
+            <td>${badge(v.attendance)}</td><td>${v.arrival_time ? fmtTime(v.arrival_time) : '-'}</td>
+            <td>${v.payment_status ? badge(v.payment_status) : '<span class="muted">Not paid</span>'}</td></tr>`).join('')}</tbody></table></div>`
+          : '<p class="muted">No vendors have a lot at this event yet.</p>'}
+      </div>`;
+  }
+</script>
+</body>
+</html>

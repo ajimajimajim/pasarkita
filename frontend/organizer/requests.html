@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Requests · PasarKita</title>
+<link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div id="sidebarScrim"></div>
+  <main class="main">
+    <header class="topbar" id="topbar"></header>
+    <div class="content">
+      <div class="tabs" id="tabs">
+        <button class="tab" data-tab="applications">Stall applications <span class="count hidden"></span></button>
+        <button class="tab" data-tab="relocations">Relocations <span class="count hidden"></span></button>
+        <button class="tab" data-tab="helpers">Helper requests <span class="count hidden"></span></button>
+        <button class="tab" data-tab="payments">Payments <span class="count hidden"></span></button>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <h2 id="tabTitle"></h2>
+          <div class="row">
+            <label class="small" style="margin:0"><input type="checkbox" id="showAll"> Show finished ones too</label>
+          </div>
+        </div>
+        <div class="table-wrap" id="tableBox"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="/assets/js/sprites.js"></script>
+<script src="/assets/js/api.js"></script>
+<script src="/assets/js/layout.js"></script>
+<script>
+  const TITLES = {
+    applications: 'Stall applications', relocations: 'Relocation requests',
+    helpers: 'Helper requests', payments: 'Payments to verify',
+  };
+  let tab = ['applications', 'relocations', 'helpers', 'payments'].includes(qs('tab')) ? qs('tab') : 'applications';
+  let helpers = [];
+  const box = document.getElementById('tableBox');
+  const showAll = document.getElementById('showAll');
+
+  (async () => {
+    await Layout.init({ role: 'organizer', page: 'requests', title: 'Requests' });
+    document.querySelectorAll('#tabs .tab').forEach((t) => { t.onclick = () => { tab = t.dataset.tab; history.replaceState(null, '', `?tab=${tab}`); load(); }; });
+    showAll.onchange = load;
+    load();
+  })();
+
+  async function updateCounts() {
+    const c = await Layout.refreshCounts();
+    if (!c) return;
+    const map = { applications: c.applications, relocations: c.relocations, helpers: c.helpers, payments: c.payments };
+    document.querySelectorAll('#tabs .tab').forEach((t) => {
+      const el = t.querySelector('.count');
+      el.textContent = map[t.dataset.tab];
+      el.classList.toggle('hidden', !map[t.dataset.tab]);
+    });
+  }
+
+  async function load() {
+    document.querySelectorAll('#tabs .tab').forEach((t) => t.classList.toggle('active', t.dataset.tab === tab));
+    document.getElementById('tabTitle').textContent = TITLES[tab];
+    box.innerHTML = '<p class="muted">Loading…</p>';
+    updateCounts();
+    const status = showAll.checked ? '' : '?status=pending';
+    try {
+      if (tab === 'applications') renderApplications(await api(`/applications${status}`));
+      if (tab === 'relocations') renderRelocations(await api(`/relocations${status}`));
+      if (tab === 'helpers') {
+        helpers = await api('/helpers');
+        renderHelperRequests(await api(`/helper-requests${showAll.checked ? '' : '?status=pending'}`));
+      }
+      if (tab === 'payments') renderPayments(await api(`/payments${status}`));
+    } catch (e) { box.innerHTML = `<div class="notice notice-error">${esc(e.message)}</div>`; }
+  }
+
+  function empty(text) { return `<div class="empty-card">${text}</div>`; }
+
+  function bind(selector, fn) { box.querySelectorAll(selector).forEach((b) => { b.onclick = () => fn(b); }); }
+
+  async function act(btn, path, body, confirmText) {
+    let note = '';
+    if (confirmText) {
+      note = await Modal.prompt(confirmText.message, { title: confirmText.title, okText: confirmText.ok, danger: confirmText.danger, placeholder: 'Optional note for the vendor' });
+      if (note === null) return;
+    }
+    await busy(btn, async () => {
+      try {
+        const r = await api(path, { method: 'PUT', body: { ...body, note } });
+        toast(r.message + (r.autoRejected ? ` ${r.autoRejected} other applicant(s) were rejected.` : ''));
+        load();
+      } catch (e) { toast(e.message, 'error'); }
+    });
+  }
+
+  // ---------- Stall applications ----------
+  function renderApplications(rows) {
+    if (!rows.length) { box.innerHTML = empty('No stall applications waiting. 🎉'); return; }
+    box.innerHTML = `<table class="table"><thead><tr><th>Event</th><th>Lot</th><th>Vendor</th><th>Details</th><th>Status</th><th></th></tr></thead><tbody>
+      ${rows.map((a) => `<tr>
+        <td><b>${esc(a.event_name)}</b><div class="small muted">${esc(fmtDate(a.event_date))}</div></td>
+        <td><b>${esc(a.lot_number || '(deleted)')}</b><div class="small muted">${esc(a.zone || '')} ${esc(a.size_label || '')}</div>
+          <a class="small" href="/organizer/dashboard.html?event=${a.event_id}">view on map</a></td>
+        <td><b>${esc(a.vendor_name)}</b><div class="small muted">${esc(a.vendor_contact)}</div></td>
+        <td class="small">${a.goods_description ? `<b>Selling:</b> ${esc(a.goods_description)}<br>` : ''}${a.notes ? `<b>Note:</b> ${esc(a.notes)}<br>` : ''}<span class="muted">Applied ${esc(fmtDateTime(a.created_at))}</span></td>
+        <td>${badge(a.status)}${a.organizer_note ? `<div class="small muted">${esc(a.organizer_note)}</div>` : ''}</td>
+        <td><div class="actions">${a.status === 'pending' ? `
+          <button class="btn btn-sm" data-accept="${a.application_id}">Accept</button>
+          <button class="btn btn-danger btn-sm" data-reject="${a.application_id}">Reject</button>`
+          : a.status === 'accepted' && a.phase !== 'past' ? `<button class="btn btn-ghost btn-sm" data-revoke="${a.application_id}">Remove from lot</button>` : ''}</div></td>
+      </tr>`).join('')}</tbody></table>`;
+    bind('[data-accept]', (b) => act(b, `/applications/${b.dataset.accept}/decision`, { decision: 'accepted' },
+      { title: 'Accept application', message: 'Give the lot to this vendor? Other applicants for the same lot will be rejected automatically.', ok: 'Accept' }));
+    bind('[data-reject]', (b) => act(b, `/applications/${b.dataset.reject}/decision`, { decision: 'rejected' },
+      { title: 'Reject application', message: 'Reject this application?', ok: 'Reject', danger: true }));
+    bind('[data-revoke]', (b) => act(b, `/applications/${b.dataset.revoke}/revoke`, {},
+      { title: 'Remove vendor from lot', message: 'The vendor will lose this lot and it becomes free again.', ok: 'Remove', danger: true }));
+  }
+
+  // ---------- Relocations ----------
+  function renderRelocations(rows) {
+    if (!rows.length) { box.innerHTML = empty('No relocation requests waiting.'); return; }
+    box.innerHTML = `<table class="table"><thead><tr><th>Event</th><th>Vendor</th><th>Move</th><th>Reason</th><th>Status</th><th></th></tr></thead><tbody>
+      ${rows.map((r) => `<tr>
+        <td><b>${esc(r.event_name)}</b><div class="small muted">${esc(fmtDate(r.event_date))}</div></td>
+        <td><b>${esc(r.vendor_name)}</b><div class="small muted">${esc(r.vendor_contact)}</div></td>
+        <td><b>${esc(r.from_lot_number || '?')}</b> → <b>${esc(r.to_lot_number || '(deleted)')}</b>
+          <div class="small muted">${esc(r.to_zone || '')} ${esc(r.to_size || '')}</div>
+          ${r.status === 'pending' && r.to_lot_vendor ? '<div class="small" style="color:var(--danger)">Target lot is now taken</div>' : ''}</td>
+        <td class="small">${esc(r.reason || '-')}</td>
+        <td>${badge(r.status)}${r.organizer_note ? `<div class="small muted">${esc(r.organizer_note)}</div>` : ''}</td>
+        <td><div class="actions">${r.status === 'pending' ? `
+          <button class="btn btn-sm" data-approve="${r.relocation_id}" ${r.to_lot_vendor ? 'disabled' : ''}>Approve</button>
+          <button class="btn btn-danger btn-sm" data-reject="${r.relocation_id}">Reject</button>` : ''}</div></td>
+      </tr>`).join('')}</tbody></table>`;
+    bind('[data-approve]', (b) => act(b, `/relocations/${b.dataset.approve}/decision`, { decision: 'approved' },
+      { title: 'Approve relocation', message: 'Move this vendor to the new lot? Their old lot becomes free.', ok: 'Approve' }));
+    bind('[data-reject]', (b) => act(b, `/relocations/${b.dataset.reject}/decision`, { decision: 'rejected' },
+      { title: 'Reject relocation', message: 'The vendor stays on their current lot.', ok: 'Reject', danger: true }));
+  }
+
+  // ---------- Helper requests ----------
+  function renderHelperRequests(rows) {
+    if (!rows.length) { box.innerHTML = empty('No helper requests waiting.'); return; }
+    const available = helpers.filter((h) => h.status === 'available');
+    box.innerHTML = `<table class="table"><thead><tr><th>Event</th><th>Vendor</th><th>Need</th><th>Status</th><th>Assign helper</th></tr></thead><tbody>
+      ${rows.map((r) => {
+        const open = r.status === 'pending' || r.status === 'assigned';
+        const options = available.map((h) => `<option value="${h.helper_id}" ${h.helper_id === r.helper_id ? 'selected' : ''}>${esc(h.name)} (${h.service_type}${h.service_type === r.service_type ? ' ✓' : ''})</option>`).join('');
+        return `<tr>
+        <td><b>${esc(r.event_name)}</b><div class="small muted">${esc(fmtDate(r.event_date))}</div></td>
+        <td><b>${esc(r.vendor_name)}</b><div class="small muted">Lot ${esc(r.lot_number || '-')} · ${esc(r.vendor_contact)}</div></td>
+        <td><b style="text-transform:capitalize">${esc(r.service_type)}</b> at ${fmtTime(r.requested_time)}${r.notes ? `<div class="small muted">${esc(r.notes)}</div>` : ''}</td>
+        <td>${badge(r.status)}${r.helper_name ? `<div class="small">${esc(r.helper_name)}</div>` : ''}${r.organizer_note ? `<div class="small muted">${esc(r.organizer_note)}</div>` : ''}</td>
+        <td>${open ? `<div class="actions">
+          ${available.length ? `<select data-sel="${r.request_id}" style="width:auto">${options}</select>
+          <button class="btn btn-sm" data-assign="${r.request_id}">${r.status === 'assigned' ? 'Reassign' : 'Assign'}</button>` : '<span class="small muted">No helpers available. <a href="/organizer/helpers.html">Add helpers</a></span>'}
+          ${r.status === 'assigned' ? `<button class="btn btn-ghost btn-sm" data-done="${r.request_id}">Mark done</button>` : ''}
+          <button class="btn btn-danger btn-sm" data-reject="${r.request_id}">Reject</button></div>` : ''}</td>
+      </tr>`;
+      }).join('')}</tbody></table>`;
+    bind('[data-assign]', (b) => act(b, `/helper-requests/${b.dataset.assign}/assign`, { helperId: box.querySelector(`[data-sel="${b.dataset.assign}"]`).value }));
+    bind('[data-done]', (b) => act(b, `/helper-requests/${b.dataset.done}/complete`, {}));
+    bind('[data-reject]', (b) => act(b, `/helper-requests/${b.dataset.reject}/reject`, {},
+      { title: 'Reject helper request', message: 'Tell the vendor why, if you like.', ok: 'Reject', danger: true }));
+  }
+
+  // ---------- Payments ----------
+  function renderPayments(rows) {
+    if (!rows.length) { box.innerHTML = empty('No payments waiting for verification.'); return; }
+    box.innerHTML = `<table class="table"><thead><tr><th>Event</th><th>Vendor</th><th>Amount</th><th>Receipt</th><th>Status</th><th></th></tr></thead><tbody>
+      ${rows.map((p) => `<tr>
+        <td><b>${esc(p.event_name)}</b><div class="small muted">${esc(fmtDate(p.event_date))}</div></td>
+        <td><b>${esc(p.vendor_name)}</b><div class="small muted">Lot ${esc(p.lot_number || '-')}</div></td>
+        <td><b>${money(p.amount)}</b>${p.lot_price !== null && Number(p.lot_price) !== Number(p.amount) ? `<div class="small" style="color:var(--danger)">Lot price is ${money(p.lot_price)}</div>` : ''}</td>
+        <td><a class="btn btn-ghost btn-sm" href="${esc(p.receipt_file_url)}" target="_blank" rel="noopener">View receipt</a><div class="small muted">${esc(fmtDateTime(p.created_at))}</div></td>
+        <td>${badge(p.status)}${p.review_note ? `<div class="small muted">${esc(p.review_note)}</div>` : ''}</td>
+        <td><div class="actions">${p.status === 'pending' ? `
+          <button class="btn btn-sm" data-verify="${p.payment_id}">Verify</button>
+          <button class="btn btn-danger btn-sm" data-reject="${p.payment_id}">Reject</button>` : ''}</div></td>
+      </tr>`).join('')}</tbody></table>`;
+    bind('[data-verify]', (b) => act(b, `/payments/${b.dataset.verify}/review`, { status: 'verified' }));
+    bind('[data-reject]', (b) => act(b, `/payments/${b.dataset.reject}/review`, { status: 'rejected' },
+      { title: 'Reject payment', message: 'The vendor will be asked to upload a new receipt.', ok: 'Reject', danger: true }));
+  }
+</script>
+</body>
+</html>

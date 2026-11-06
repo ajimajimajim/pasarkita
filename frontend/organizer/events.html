@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Events · PasarKita</title>
+<link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div id="sidebarScrim"></div>
+  <main class="main">
+    <header class="topbar" id="topbar"></header>
+    <div class="content">
+      <div class="card">
+        <div class="card-head">
+          <h2 id="formTitle">Create a new event</h2>
+          <button class="btn btn-ghost btn-sm hidden" id="cancelEdit" type="button">Cancel editing</button>
+        </div>
+        <form id="eventForm" class="form-grid">
+          <div class="full"><label for="name">Event name *</label><input type="text" id="name" name="name" required maxlength="150" placeholder="e.g. PasarKita Night Market"></div>
+          <div><label for="eventDate">Date *</label><input type="date" id="eventDate" name="eventDate" required></div>
+          <div><label for="location">Location *</label><input type="text" id="location" name="location" required maxlength="200"></div>
+          <div><label for="startTime">Start time *</label><input type="time" id="startTime" name="startTime" required></div>
+          <div><label for="endTime">End time *</label><input type="time" id="endTime" name="endTime" required></div>
+          <div class="full form-actions"><button class="btn" type="submit" id="saveBtn">Create event</button></div>
+        </form>
+        <p class="hint">After creating an event, click <b>Edit map</b> to upload the venue picture and place the lots.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>All events</h2>
+          <div class="tabs" style="margin:0" id="filterTabs">
+            <button class="tab active" data-f="active">Today &amp; upcoming</button>
+            <button class="tab" data-f="past">Past</button>
+            <button class="tab" data-f="cancelled">Cancelled</button>
+            <button class="tab" data-f="all">All</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>Event</th><th>Date &amp; time</th><th>Status</th><th>Lots</th><th>Waiting</th><th></th></tr></thead>
+            <tbody id="rows"><tr><td colspan="6" class="muted">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="/assets/js/sprites.js"></script>
+<script src="/assets/js/api.js"></script>
+<script src="/assets/js/layout.js"></script>
+<script>
+  let events = [];
+  let filter = 'active';
+  let editingId = null;
+  const form = document.getElementById('eventForm');
+
+  (async () => {
+    await Layout.init({ role: 'organizer', page: 'events', title: 'Events' });
+    await load();
+  })();
+
+  async function load() {
+    events = await api('/events/all');
+    render();
+  }
+
+  function render() {
+    const list = events.filter((e) => filter === 'all'
+      || (filter === 'active' && (e.phase === 'ongoing' || e.phase === 'upcoming'))
+      || e.phase === filter)
+      .sort((a, b) => (filter === 'active' ? a.event_date.localeCompare(b.event_date) : b.event_date.localeCompare(a.event_date)));
+    const rows = document.getElementById('rows');
+    if (!list.length) { rows.innerHTML = '<tr><td colspan="6" class="muted">No events here.</td></tr>'; return; }
+    rows.innerHTML = list.map((e) => `
+      <tr>
+        <td><b>${esc(e.name)}</b><div class="small muted">${esc(e.location)}</div></td>
+        <td>${esc(fmtDate(e.event_date))}<div class="small muted">${fmtTime(e.start_time)}–${fmtTime(e.end_time)}</div></td>
+        <td>${badge(e.phase, e.phase === 'ongoing' ? 'Today' : undefined)}</td>
+        <td>${e.taken_lots}/${e.total_lots}</td>
+        <td>${e.pending_applications ? `<a href="/organizer/requests.html?tab=applications">${e.pending_applications} application(s)</a>` : '<span class="muted">-</span>'}</td>
+        <td><div class="actions">
+          <a class="btn btn-sm" href="/organizer/map-editor.html?event=${e.event_id}">Edit map</a>
+          ${e.phase !== 'past' ? `<button class="btn btn-ghost btn-sm" data-edit="${e.event_id}">Edit</button>` : ''}
+          ${e.phase === 'cancelled' ? `<button class="btn btn-ghost btn-sm" data-restore="${e.event_id}">Restore</button>`
+            : e.phase !== 'past' ? `<button class="btn btn-ghost btn-sm" data-cancel="${e.event_id}">Cancel</button>` : ''}
+          <button class="btn btn-danger btn-sm" data-del="${e.event_id}">Delete</button>
+        </div></td>
+      </tr>`).join('');
+    rows.querySelectorAll('[data-edit]').forEach((b) => { b.onclick = () => startEdit(Number(b.dataset.edit)); });
+    rows.querySelectorAll('[data-cancel]').forEach((b) => { b.onclick = () => setStatus(b, b.dataset.cancel, 'cancelled'); });
+    rows.querySelectorAll('[data-restore]').forEach((b) => { b.onclick = () => setStatus(b, b.dataset.restore, 'scheduled'); });
+    rows.querySelectorAll('[data-del]').forEach((b) => { b.onclick = () => remove(b, b.dataset.del); });
+  }
+
+  document.querySelectorAll('#filterTabs .tab').forEach((t) => {
+    t.onclick = () => {
+      document.querySelectorAll('#filterTabs .tab').forEach((x) => x.classList.remove('active'));
+      t.classList.add('active');
+      filter = t.dataset.f;
+      render();
+    };
+  });
+
+  function startEdit(id) {
+    const e = events.find((x) => x.event_id === id);
+    editingId = id;
+    const f = form.elements;
+    f.name.value = e.name;
+    f.eventDate.value = e.event_date;
+    f.location.value = e.location;
+    f.startTime.value = String(e.start_time).slice(0, 5);
+    f.endTime.value = String(e.end_time).slice(0, 5);
+    document.getElementById('formTitle').textContent = `Edit: ${e.name}`;
+    document.getElementById('saveBtn').textContent = 'Save changes';
+    document.getElementById('cancelEdit').classList.remove('hidden');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function resetForm() {
+    editingId = null;
+    form.reset();
+    document.getElementById('formTitle').textContent = 'Create a new event';
+    document.getElementById('saveBtn').textContent = 'Create event';
+    document.getElementById('cancelEdit').classList.add('hidden');
+  }
+  document.getElementById('cancelEdit').onclick = resetForm;
+
+  form.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    await busy(document.getElementById('saveBtn'), async () => {
+      try {
+        const body = formData(form);
+        if (editingId) {
+          await api(`/events/${editingId}`, { method: 'PUT', body });
+          toast('Event updated.');
+          resetForm();
+          await load();
+        } else {
+          const r = await api('/events', { method: 'POST', body });
+          toast('Event created. Now set up its map.');
+          location.href = `/organizer/map-editor.html?event=${r.eventId}`;
+        }
+      } catch (e) { toast(e.message, 'error'); }
+    });
+  });
+
+  async function setStatus(btn, id, status) {
+    if (status === 'cancelled' && !(await Modal.confirm('Vendors will no longer see this event on their dashboard.', { title: 'Cancel this event?', okText: 'Cancel event', danger: true }))) return;
+    await busy(btn, async () => {
+      try { toast((await api(`/events/${id}/status`, { method: 'PUT', body: { status } })).message); await load(); }
+      catch (e) { toast(e.message, 'error'); }
+    });
+  }
+
+  async function remove(btn, id) {
+    if (!(await Modal.confirm('This deletes the event, its map and all its lots. This cannot be undone.', { title: 'Delete event?', okText: 'Delete', danger: true }))) return;
+    await busy(btn, async () => {
+      try { toast((await api(`/events/${id}`, { method: 'DELETE' })).message); await load(); }
+      catch (e) { toast(e.message, 'error'); }
+    });
+  }
+</script>
+</body>
+</html>

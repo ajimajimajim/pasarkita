@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PasarKita</title>
+<link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div id="sidebarScrim"></div>
+  <main class="main">
+    <header class="topbar" id="topbar"></header>
+    <div class="content">
+      <div class="card">
+        <div class="card-head">
+          <h2>Registered vendors</h2>
+          <input type="search" id="search" placeholder="Search name, goods, username or phone…" style="max-width:340px">
+        </div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>Vendor</th><th>Contact</th><th>Sells</th><th>Lots</th><th>Joined</th><th></th></tr></thead>
+            <tbody id="rows"><tr><td colspan="6" class="muted">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="/assets/js/sprites.js"></script>
+<script src="/assets/js/api.js"></script>
+<script src="/assets/js/layout.js"></script>
+<script>
+  let vendors = [];
+  let timer = null;
+
+  (async () => {
+    await Layout.init({ role: 'organizer', page: 'vendors', title: 'Vendors' });
+    load();
+    document.getElementById('search').addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(load, 250); });
+  })();
+
+  async function load() {
+    const q = document.getElementById('search').value.trim();
+    vendors = await api('/vendors' + (q ? '?search=' + encodeURIComponent(q) : ''));
+    const rows = document.getElementById('rows');
+    if (!vendors.length) { rows.innerHTML = '<tr><td colspan="6" class="muted">No vendors found.</td></tr>'; return; }
+    rows.innerHTML = vendors.map((v) => `<tr>
+      <td><b>${esc(v.name)}</b><div class="small muted">@${esc(v.username)}</div></td>
+      <td>${esc(v.contact_number)}<div class="small muted">${esc(v.email || '')}</div></td>
+      <td>${esc(v.goods_type || '-')}<div class="small muted">${esc(v.stall_size_required || '')}</div></td>
+      <td>${v.accepted_lots} given${v.pending_applications ? `<div class="small muted">${v.pending_applications} waiting</div>` : ''}</td>
+      <td class="small">${esc(fmtDate(v.registered_at, { day: 'numeric', month: 'short', year: 'numeric' }))}</td>
+      <td><div class="actions">
+        <button class="btn btn-ghost btn-sm" data-view="${v.vendor_id}">View</button>
+        <button class="btn btn-ghost btn-sm" data-edit="${v.vendor_id}">Edit</button>
+        <button class="btn btn-danger btn-sm" data-del="${v.vendor_id}">Delete</button>
+      </div></td></tr>`).join('');
+    rows.querySelectorAll('[data-view]').forEach((b) => { b.onclick = () => view(b.dataset.view); });
+    rows.querySelectorAll('[data-edit]').forEach((b) => { b.onclick = () => edit(Number(b.dataset.edit)); });
+    rows.querySelectorAll('[data-del]').forEach((b) => { b.onclick = () => remove(b, Number(b.dataset.del)); });
+  }
+
+  async function view(id) {
+    const v = await api('/vendors/' + id);
+    Modal.open(`
+      <h3>${esc(v.name)}</h3>
+      <dl class="kv">
+        <dt>Username</dt><dd>@${esc(v.username)}</dd><dt>Phone</dt><dd>${esc(v.contact_number)}</dd>
+        <dt>Email</dt><dd>${esc(v.email || '-')}</dd><dt>Sells</dt><dd>${esc(v.goods_type || '-')}</dd>
+        <dt>Stall size</dt><dd>${esc(v.stall_size_required || '-')}</dd>
+      </dl>
+      <h3>Application history</h3>
+      ${v.applications.length ? `<table class="table"><tbody>${v.applications.map((a) => `<tr>
+        <td>${esc(a.event_name)}<div class="small muted">${esc(fmtDate(a.event_date))}</div></td>
+        <td>Lot ${esc(a.lot_number || '-')}</td><td>${badge(a.status)}</td></tr>`).join('')}</tbody></table>` : '<p class="muted">No applications yet.</p>'}
+      <div class="modal-actions"><button class="btn btn-ghost" onclick="Modal.close()">Close</button></div>`, { wide: true });
+  }
+
+  function edit(id) {
+    const v = vendors.find((x) => x.vendor_id === id);
+    const m = Modal.open(`
+      <h3>Edit vendor</h3>
+      <form id="editForm">
+        <label>Business / owner name *</label><input type="text" name="name" required maxlength="120" value="${esc(v.name)}">
+        <label>Phone *</label><input type="text" name="contactNumber" required maxlength="30" value="${esc(v.contact_number)}">
+        <label>Email</label><input type="email" name="email" maxlength="120" value="${esc(v.email || '')}">
+        <label>Sells</label><input type="text" name="goodsType" maxlength="100" value="${esc(v.goods_type || '')}">
+        <label>Stall size needed</label><input type="text" name="stallSizeRequired" maxlength="50" value="${esc(v.stall_size_required || '')}">
+        <div class="modal-actions"><button type="button" class="btn btn-ghost" onclick="Modal.close()">Back</button><button class="btn" type="submit">Save</button></div>
+      </form>`);
+    m.querySelector('form').onsubmit = async (e) => {
+      e.preventDefault();
+      try { await api('/vendors/' + id, { method: 'PUT', body: formData(e.target) }); Modal.close(); toast('Vendor updated.'); load(); }
+      catch (err) { toast(err.message, 'error'); }
+    };
+  }
+
+  async function remove(btn, id) {
+    const v = vendors.find((x) => x.vendor_id === id);
+    if (!(await Modal.confirm(`Delete ${v.name}'s account? Their applications, payments and requests are deleted, and their lots become free.`, { title: 'Delete vendor?', okText: 'Delete', danger: true }))) return;
+    await busy(btn, async () => {
+      try { toast((await api('/vendors/' + id, { method: 'DELETE' })).message); load(); }
+      catch (e) { toast(e.message, 'error'); }
+    });
+  }
+</script>
+</body>
+</html>

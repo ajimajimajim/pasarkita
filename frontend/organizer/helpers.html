@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PasarKita</title>
+<link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div id="sidebarScrim"></div>
+  <main class="main">
+    <header class="topbar" id="topbar"></header>
+    <div class="content">
+      <div class="grid-2" style="align-items:start">
+        <div class="card">
+          <h2 id="formTitle">Add a helper</h2>
+          <form id="helperForm">
+            <label for="name">Name *</label><input type="text" id="name" name="name" required maxlength="120">
+            <label for="contactNumber">Phone</label><input type="text" id="contactNumber" name="contactNumber" maxlength="30">
+            <label for="serviceType">Service *</label>
+            <select id="serviceType" name="serviceType"><option value="porter">Porter (carries goods)</option><option value="trolley">Trolley (moves loads with trolley)</option></select>
+            <label for="status">Status</label>
+            <select id="status" name="status"><option value="available">Available</option><option value="off_duty">Off duty</option></select>
+            <div class="form-actions">
+              <button class="btn" type="submit" id="saveBtn">Add helper</button>
+              <button class="btn btn-ghost hidden" type="button" id="cancelEdit">Cancel</button>
+            </div>
+          </form>
+        </div>
+        <div class="card">
+          <h2>How helpers work</h2>
+          <p>Vendors with a lot can ask for a <b>porter</b> or a <b>trolley</b> helper at a set time.</p>
+          <p>You assign a helper in <a href="/organizer/requests.html?tab=helpers">Requests → Helper requests</a>. Only helpers marked <b>Available</b> can be assigned.</p>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Helper roster</h2>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>Name</th><th>Phone</th><th>Service</th><th>Status</th><th>Active jobs</th><th></th></tr></thead>
+            <tbody id="rows"><tr><td colspan="6" class="muted">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="/assets/js/sprites.js"></script>
+<script src="/assets/js/api.js"></script>
+<script src="/assets/js/layout.js"></script>
+<script>
+  let helpers = [];
+  let editingId = null;
+  const form = document.getElementById('helperForm');
+
+  (async () => {
+    await Layout.init({ role: 'organizer', page: 'helpers', title: 'Helpers' });
+    load();
+  })();
+
+  async function load() {
+    helpers = await api('/helpers');
+    const rows = document.getElementById('rows');
+    if (!helpers.length) { rows.innerHTML = '<tr><td colspan="6" class="muted">No helpers yet. Add one above.</td></tr>'; return; }
+    rows.innerHTML = helpers.map((h) => `<tr>
+      <td><b>${esc(h.name)}</b></td><td>${esc(h.contact_number || '-')}</td>
+      <td style="text-transform:capitalize">${esc(h.service_type)}</td><td>${badge(h.status)}</td><td>${h.active_jobs}</td>
+      <td><div class="actions">
+        <button class="btn btn-ghost btn-sm" data-toggle="${h.helper_id}">${h.status === 'available' ? 'Set off duty' : 'Set available'}</button>
+        <button class="btn btn-ghost btn-sm" data-edit="${h.helper_id}">Edit</button>
+        <button class="btn btn-danger btn-sm" data-del="${h.helper_id}">Remove</button>
+      </div></td></tr>`).join('');
+    rows.querySelectorAll('[data-toggle]').forEach((b) => { b.onclick = () => toggle(b, Number(b.dataset.toggle)); });
+    rows.querySelectorAll('[data-edit]').forEach((b) => { b.onclick = () => startEdit(Number(b.dataset.edit)); });
+    rows.querySelectorAll('[data-del]').forEach((b) => { b.onclick = () => remove(b, Number(b.dataset.del)); });
+  }
+
+  function body(h) { return { name: h.name, contactNumber: h.contact_number, serviceType: h.service_type, status: h.status }; }
+
+  async function toggle(btn, id) {
+    const h = helpers.find((x) => x.helper_id === id);
+    await busy(btn, async () => {
+      try { await api('/helpers/' + id, { method: 'PUT', body: { ...body(h), status: h.status === 'available' ? 'off_duty' : 'available' } }); load(); }
+      catch (e) { toast(e.message, 'error'); }
+    });
+  }
+
+  function startEdit(id) {
+    const h = helpers.find((x) => x.helper_id === id);
+    editingId = id;
+    const f = form.elements;
+    f.name.value = h.name; f.contactNumber.value = h.contact_number || ''; f.serviceType.value = h.service_type; f.status.value = h.status;
+    document.getElementById('formTitle').textContent = 'Edit helper';
+    document.getElementById('saveBtn').textContent = 'Save changes';
+    document.getElementById('cancelEdit').classList.remove('hidden');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function resetForm() {
+    editingId = null; form.reset();
+    document.getElementById('formTitle').textContent = 'Add a helper';
+    document.getElementById('saveBtn').textContent = 'Add helper';
+    document.getElementById('cancelEdit').classList.add('hidden');
+  }
+  document.getElementById('cancelEdit').onclick = resetForm;
+
+  form.onsubmit = async (e) => {
+    e.preventDefault();
+    await busy(document.getElementById('saveBtn'), async () => {
+      try {
+        if (editingId) await api('/helpers/' + editingId, { method: 'PUT', body: formData(form) });
+        else await api('/helpers', { method: 'POST', body: formData(form) });
+        toast(editingId ? 'Helper updated.' : 'Helper added.');
+        resetForm(); load();
+      } catch (err) { toast(err.message, 'error'); }
+    });
+  };
+
+  async function remove(btn, id) {
+    const h = helpers.find((x) => x.helper_id === id);
+    if (!(await Modal.confirm(`Remove ${h.name} from the roster?`, { title: 'Remove helper?', okText: 'Remove', danger: true }))) return;
+    await busy(btn, async () => {
+      try { toast((await api('/helpers/' + id, { method: 'DELETE' })).message); load(); }
+      catch (e) { toast(e.message, 'error'); }
+    });
+  }
+</script>
+</body>
+</html>

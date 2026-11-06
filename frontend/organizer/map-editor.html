@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Map Editor · PasarKita</title>
+<link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div id="sidebarScrim"></div>
+  <main class="main">
+    <header class="topbar" id="topbar"></header>
+    <div class="content">
+      <div class="card">
+        <div class="row">
+          <label for="eventSelect" style="margin:0">Event</label>
+          <select id="eventSelect" style="max-width:360px"></select>
+          <span class="spacer"></span>
+          <span id="dirtyLabel" class="small muted"></span>
+          <button class="btn btn-ghost" id="discardBtn" disabled>Undo changes</button>
+          <button class="btn" id="saveBtn" disabled>Save map</button>
+        </div>
+      </div>
+
+      <div class="editor" id="editor">
+        <section>
+          <div class="card">
+            <div class="toolbar">
+              <button class="btn btn-accent" id="addLotBtn">+ Add lot</button>
+              <label class="btn btn-ghost" style="margin:0" for="mapFile">Upload venue picture</label>
+              <input type="file" id="mapFile" accept="image/png,image/jpeg,image/gif,image/webp" class="hidden">
+              <button class="btn btn-ghost" id="removeImgBtn">Remove picture</button>
+              <span class="spacer"></span>
+              <select id="copySelect" style="max-width:230px"><option value="">Copy layout from…</option></select>
+            </div>
+            <div id="map"></div>
+            <div class="legend" id="legend"></div>
+            <p class="hint">Drag a box to move it. Drag the white corner to resize. Arrow keys nudge the selected box (hold Shift for bigger steps). Press Delete to remove it.</p>
+          </div>
+        </section>
+
+        <aside>
+          <div class="card">
+            <h3>Add a facility</h3>
+            <div class="palette" id="palette"></div>
+          </div>
+          <div class="card" id="props"><h3>Selected item</h3><p class="muted">Click a lot or facility on the map to edit it.</p></div>
+        </aside>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="/assets/js/sprites.js"></script>
+<script src="/assets/js/api.js"></script>
+<script src="/assets/js/layout.js"></script>
+<script src="/assets/js/map.js"></script>
+<script>
+  let events = [];
+  let eventId = null;
+  let snapshot = null; // last saved map data, for "Undo changes"
+  const props = document.getElementById('props');
+  const map = new PixelMap(document.getElementById('map'), { editable: true, onSelect: showProps, onChange: markDirty });
+  renderLegend(document.getElementById('legend'), ['edit', 'pending', 'taken']);
+
+  document.getElementById('palette').innerHTML = FACILITY_TYPES.map((f) =>
+    `<button class="palette-btn" data-type="${f.type}" title="Add ${f.label}">${Sprites.svg(f.type)}<span>${f.label}</span></button>`).join('');
+  document.querySelectorAll('.palette-btn').forEach((b) => {
+    b.onclick = () => { const f = FACILITY_TYPES.find((x) => x.type === b.dataset.type); map.addFacility(f.type, f.label); };
+  });
+
+  (async () => {
+    await Layout.init({ role: 'organizer', page: 'map-editor', title: 'Map Editor' });
+    events = await api('/events/all');
+    if (!events.length) {
+      document.getElementById('editor').innerHTML = '<div class="empty-card">No events yet. <a href="/organizer/events.html">Create an event</a> first.</div>';
+      return;
+    }
+    const order = { ongoing: 0, upcoming: 1, past: 2, cancelled: 3 };
+    events.sort((a, b) => order[a.phase] - order[b.phase] || a.event_date.localeCompare(b.event_date));
+    const sel = document.getElementById('eventSelect');
+    sel.innerHTML = events.map((e) => `<option value="${e.event_id}">${esc(e.name)} · ${esc(fmtDate(e.event_date))}${e.phase === 'ongoing' ? ' (today)' : e.phase === 'past' ? ' (past)' : e.phase === 'cancelled' ? ' (cancelled)' : ''}</option>`).join('');
+    const wanted = Number(qs('event'));
+    sel.value = events.some((e) => e.event_id === wanted) ? wanted : events[0].event_id;
+    sel.onchange = async () => {
+      if (map.dirty && !(await Modal.confirm('You have unsaved changes on this map. Leave without saving?', { title: 'Unsaved changes', okText: 'Leave' }))) {
+        sel.value = eventId;
+        return;
+      }
+      loadEvent(Number(sel.value));
+    };
+    loadEvent(Number(sel.value));
+  })();
+
+  async function loadEvent(id) {
+    eventId = id;
+    history.replaceState(null, '', `?event=${id}`);
+    snapshot = await api(`/events/${id}/map`);
+    map.setData(snapshot);
+    markClean();
+    showProps(null);
+    const copy = document.getElementById('copySelect');
+    copy.innerHTML = '<option value="">Copy layout from…</option>' + events.filter((e) => e.event_id !== id)
+      .map((e) => `<option value="${e.event_id}">${esc(e.name)} · ${esc(fmtDate(e.event_date, { day: 'numeric', month: 'short' }))}</option>`).join('');
+  }
+
+  function markDirty() {
+    document.getElementById('saveBtn').disabled = false;
+    document.getElementById('discardBtn').disabled = false;
+    document.getElementById('dirtyLabel').innerHTML = '<span class="dirty-dot"></span>Unsaved changes';
+  }
+  function markClean() {
+    map.dirty = false;
+    document.getElementById('saveBtn').disabled = true;
+    document.getElementById('discardBtn').disabled = true;
+    document.getElementById('dirtyLabel').textContent = 'All changes saved';
+  }
+  window.addEventListener('beforeunload', (e) => { if (map.dirty) { e.preventDefault(); e.returnValue = ''; } });
+
+  document.getElementById('addLotBtn').onclick = () => map.addLot();
+
+  document.getElementById('saveBtn').onclick = (ev) => busy(ev.currentTarget, async () => {
+    try {
+      const keep = map.selected();
+      const keepNumber = keep && keep.kind === 'lot' ? keep.lot_number : null;
+      const r = await api(`/events/${eventId}/layout`, { method: 'PUT', body: map.getLayout() });
+      snapshot = r;
+      map.setData(r);
+      markClean();
+      if (keepNumber) {
+        const again = map.lots().find((l) => l.lot_number === keepNumber);
+        if (again) map.select(again.key); else showProps(null);
+      } else showProps(null);
+      toast('Map saved.');
+    } catch (e) { toast(e.message, 'error'); }
+  });
+
+  document.getElementById('discardBtn').onclick = async () => {
+    if (!(await Modal.confirm('Go back to the last saved version of this map?', { title: 'Undo changes', okText: 'Undo' }))) return;
+    map.setData(snapshot);
+    markClean();
+    showProps(null);
+  };
+
+  document.getElementById('mapFile').onchange = async (ev) => {
+    const file = ev.target.files[0];
+    ev.target.value = '';
+    if (!file) return;
+    const form = new FormData();
+    form.append('map', file);
+    try {
+      const r = await api(`/events/${eventId}/map-image`, { method: 'POST', form });
+      snapshot.event.map_image_url = r.mapImageUrl;
+      map.setBackground(r.mapImageUrl);
+      toast('Venue picture uploaded.');
+    } catch (e) { toast(e.message, 'error'); }
+  };
+
+  document.getElementById('removeImgBtn').onclick = async (ev) => {
+    if (!map.event.map_image_url) { toast('This map has no picture.', 'error'); return; }
+    if (!(await Modal.confirm('The map will use a plain grass background.', { title: 'Remove venue picture?', okText: 'Remove' }))) return;
+    try {
+      await api(`/events/${eventId}/map-image`, { method: 'DELETE' });
+      snapshot.event.map_image_url = null;
+      map.setBackground(null);
+      toast('Picture removed.');
+    } catch (e) { toast(e.message, 'error'); }
+  };
+
+  document.getElementById('copySelect').onchange = async (ev) => {
+    const from = Number(ev.target.value);
+    ev.target.value = '';
+    if (!from) return;
+    if (!(await Modal.confirm('This replaces the lots and facilities on this map with a copy from the other event. Lots that already have vendors or applicants are kept. Nothing is saved until you click Save map.', { title: 'Copy layout?', okText: 'Copy' }))) return;
+    const data = await api(`/events/${from}/map`);
+    const kept = map.copyFrom(data);
+    if (data.event.map_image_url && !map.event.map_image_url) {
+      toast('Tip: the other event has a venue picture. Upload the same picture here too if you want it.', 'success');
+    }
+    toast(kept ? `Layout copied. ${kept} lot(s) with vendors/applicants were kept.` : 'Layout copied. Click Save map to keep it.');
+    showProps(null);
+  };
+
+  // ---------- Properties panel ----------
+  function showProps(item) {
+    if (!item) {
+      props.innerHTML = '<h3>Selected item</h3><p class="muted">Click a lot or facility on the map to edit it.</p>';
+      return;
+    }
+    // While dragging, only refresh the numbers so typing focus isn't lost.
+    if (props.dataset.key === item.key && props.querySelector('[name=x]')) {
+      ['x', 'y', 'w', 'h'].forEach((k) => { const el = props.querySelector(`[name=${k}]`); if (document.activeElement !== el) el.value = item[k]; });
+      return;
+    }
+    props.dataset.key = item.key;
+    const coords = `
+      <div class="coords">
+        <div><label>X %</label><input type="number" name="x" step="0.5" min="0" max="100" value="${item.x}"></div>
+        <div><label>Y %</label><input type="number" name="y" step="0.5" min="0" max="100" value="${item.y}"></div>
+        <div><label>Width %</label><input type="number" name="w" step="0.5" min="2" max="100" value="${item.w}"></div>
+        <div><label>Height %</label><input type="number" name="h" step="0.5" min="2" max="100" value="${item.h}"></div>
+      </div>`;
+
+    if (item.kind === 'lot') {
+      const zones = [...new Set(map.lots().map((l) => l.zone).filter(Boolean))];
+      props.innerHTML = `
+        <h3>Lot</h3>
+        ${item.vendor_id ? `<div class="notice notice-info small">Taken by ${esc(item.vendor_name || 'a vendor')}. You can move it, but not delete it.</div>`
+          : item.pending_count ? `<div class="notice notice-warn small">${item.pending_count} vendor(s) applied for this lot.</div>` : ''}
+        <label>Lot number *</label><input type="text" name="lot_number" maxlength="20" value="${esc(item.lot_number)}">
+        <label>Size (shown to vendors)</label><input type="text" name="size_label" maxlength="50" value="${esc(item.size_label || '')}" placeholder="e.g. 20ft x 17ft">
+        <label>Zone</label><input type="text" name="zone" maxlength="60" list="zoneList" value="${esc(item.zone || '')}" placeholder="e.g. Riverside">
+        <datalist id="zoneList">${zones.map((z) => `<option value="${esc(z)}">`).join('')}</datalist>
+        <label>Price (RM)</label><input type="number" name="price" min="0" step="0.50" value="${Number(item.price || 0)}">
+        ${coords}
+        <div class="form-actions"><button class="btn btn-danger btn-sm" id="delBtn">Delete lot</button></div>`;
+    } else {
+      props.innerHTML = `
+        <h3>Facility</h3>
+        <label>Type</label>
+        <select name="type">${FACILITY_TYPES.map((f) => `<option value="${f.type}" ${f.type === item.type ? 'selected' : ''}>${f.label}</option>`).join('')}</select>
+        <label>Label</label><input type="text" name="label" maxlength="60" value="${esc(item.label || '')}">
+        ${coords}
+        <div class="form-actions"><button class="btn btn-danger btn-sm" id="delBtn">Delete facility</button></div>`;
+    }
+
+    props.querySelectorAll('input, select').forEach((input) => {
+      input.addEventListener('input', () => {
+        const k = input.name;
+        let v = input.value;
+        if (['x', 'y', 'w', 'h', 'price'].includes(k)) {
+          v = Number(v);
+          if (!Number.isFinite(v) || input.value === '') return;
+        }
+        if (k === 'lot_number') v = v.trim();
+        map.updateSelected({ [k]: v });
+      });
+      if (input.name === 'type') {
+        input.addEventListener('change', () => {
+          const f = FACILITY_TYPES.find((x) => x.type === input.value);
+          const labelInput = props.querySelector('[name=label]');
+          if (f && (!labelInput.value || FACILITY_TYPES.some((x) => x.label === labelInput.value))) {
+            labelInput.value = f.label;
+            map.updateSelected({ label: f.label });
+          }
+        });
+      }
+      // Re-sync numbers after the map clamps them (e.g. pushed back inside the map).
+      input.addEventListener('change', () => { if (['x', 'y', 'w', 'h'].includes(input.name)) input.value = map.selected()[input.name]; });
+    });
+    props.querySelector('#delBtn').onclick = () => { if (map.deleteSelected()) delete props.dataset.key; };
+  }
+</script>
+</body>
+</html>

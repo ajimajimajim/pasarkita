@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard · PasarKita</title>
+<link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div id="sidebarScrim"></div>
+  <main class="main">
+    <header class="topbar" id="topbar"></header>
+    <div class="content">
+      <div class="stat-grid" id="stats"></div>
+      <div class="event-strip" id="eventStrip"></div>
+      <div class="board">
+        <section class="board-map">
+          <div class="card">
+            <div class="map-title">
+              <div><h2 id="mapTitle">Stall map</h2><div class="muted small" id="mapMeta"></div></div>
+              <a class="btn btn-ghost btn-sm" id="editMapLink" href="/organizer/map-editor.html">Edit this map</a>
+            </div>
+            <div id="map"></div>
+            <div class="legend" id="legend"></div>
+            <p class="muted small" style="margin-top:8px">Red number = how many vendors are applying for that lot.</p>
+          </div>
+        </section>
+        <aside class="panel">
+          <div class="card" id="lotPanel"><h3>Lot details</h3><p class="muted">Click a lot to see who is applying.</p></div>
+          <div class="card"><h3>Lots by zone</h3><div id="zones"></div></div>
+        </aside>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="/assets/js/sprites.js"></script>
+<script src="/assets/js/api.js"></script>
+<script src="/assets/js/layout.js"></script>
+<script src="/assets/js/map.js"></script>
+<script>
+  let events = [];
+  let current = null;   // { event, lots, facilities }
+  let openLotId = null;
+  const map = new PixelMap(document.getElementById('map'), { onLotClick: (lot) => showLot(lot.lot_id), showPendingBadge: true });
+  renderLegend(document.getElementById('legend'), ['available', 'pending', 'taken']);
+
+  (async () => {
+    await Layout.init({ role: 'organizer', page: 'dashboard', title: 'Dashboard' });
+    events = await api('/events');
+    renderStats();
+    renderEventCards(document.getElementById('eventStrip'), events, null, pick);
+    const first = pickDefaultEvent(events);
+    if (first) pick(first);
+    else document.getElementById('map').innerHTML = '<div class="empty-card">No ongoing or upcoming events. <a href="/organizer/events.html">Create an event</a> to get started.</div>';
+  })();
+
+  async function renderStats() {
+    const c = await Layout.refreshCounts() || { applications: 0, relocations: 0, helpers: 0, payments: 0 };
+    const today = events.filter((e) => e.phase === 'ongoing').length;
+    const tile = (v, l, href) => `<a class="stat" href="${href}" style="text-decoration:none;color:inherit"><div class="stat-value">${v}</div><div class="stat-label">${l}</div></a>`;
+    document.getElementById('stats').innerHTML =
+      tile(today, 'Events today', '/organizer/events.html') +
+      tile(events.length - today, 'Upcoming events', '/organizer/events.html') +
+      tile(c.applications, 'Stall applications waiting', '/organizer/requests.html?tab=applications') +
+      tile(c.relocations + c.helpers, 'Relocation & helper requests', '/organizer/requests.html?tab=relocations') +
+      tile(c.payments, 'Payments to verify', '/organizer/requests.html?tab=payments');
+  }
+
+  async function pick(id) {
+    renderEventCards(document.getElementById('eventStrip'), events, id, pick);
+    await loadMap(id);
+    openLotId = null;
+    document.getElementById('lotPanel').innerHTML = '<h3>Lot details</h3><p class="muted">Click a lot to see who is applying.</p>';
+  }
+
+  async function loadMap(id) {
+    current = await api(`/events/${id}/map`);
+    const e = current.event;
+    document.getElementById('mapTitle').textContent = e.name;
+    document.getElementById('mapMeta').textContent = `${fmtDate(e.event_date)} · ${fmtTime(e.start_time)}–${fmtTime(e.end_time)} · ${e.location}`;
+    document.getElementById('editMapLink').href = `/organizer/map-editor.html?event=${id}`;
+    map.setData(current);
+    if (openLotId) map.highlightLot(openLotId);
+    renderZoneList(document.getElementById('zones'), current.lots, { onClick: (l) => showLot(l.lot_id), showVendor: true });
+  }
+
+  async function showLot(lotId) {
+    openLotId = lotId;
+    map.highlightLot(lotId);
+    const panel = document.getElementById('lotPanel');
+    const lot = current.lots.find((l) => l.lot_id === lotId);
+    if (!lot) return;
+    const st = defaultLotState(lot);
+    panel.innerHTML = `
+      <div class="lot-head"><span class="lot-big st-${st}">${esc(lot.lot_number)}</span>
+        <div><b>${esc(lot.zone || 'No zone')}</b><br><span class="muted small">${LOT_STATE_LABELS[st]}</span></div></div>
+      <dl class="kv"><dt>Size</dt><dd>${esc(lot.size_label || '-')}</dd><dt>Price</dt><dd>${money(lot.price)}</dd></dl>
+      <div id="applicants"><p class="muted">Loading applicants…</p></div>`;
+
+    const apps = await api(`/lots/${lotId}/applications`);
+    const accepted = apps.find((a) => a.status === 'accepted');
+    const pending = apps.filter((a) => a.status === 'pending');
+    const closed = current.event.phase !== 'upcoming' && current.event.phase !== 'ongoing';
+    let html = '';
+
+    if (accepted) {
+      html += `<h3>Vendor on this lot</h3>
+        <div class="applicant">
+          <div class="applicant-name">${esc(accepted.vendor_name)}</div>
+          <div class="small muted">${esc(accepted.vendor_goods || '')} · ${esc(accepted.vendor_contact)}</div>
+          <div class="small" style="margin-top:6px">Attendance: ${badge(accepted.attendance)}
+            ${accepted.arrival_time ? ` · arrives ${fmtTime(accepted.arrival_time)}` : ''}</div>
+          ${closed ? '' : `<div class="row" style="margin-top:8px"><button class="btn btn-ghost btn-sm" data-revoke="${accepted.application_id}">Remove vendor from lot</button></div>`}
+        </div>`;
+    }
+
+    html += `<h3 style="margin-top:12px">Applying (${pending.length})</h3>`;
+    if (!pending.length) html += '<p class="muted small">No one is waiting for this lot.</p>';
+    html += pending.map((a) => `
+      <div class="applicant">
+        <div class="applicant-name">${esc(a.vendor_name)}</div>
+        <div class="small muted">${esc(a.vendor_goods || '')} · ${esc(a.vendor_contact)} · applied ${esc(fmtDateTime(a.created_at))}</div>
+        ${a.goods_description ? `<div class="small" style="margin-top:4px"><b>Selling:</b> ${esc(a.goods_description)}</div>` : ''}
+        ${a.notes ? `<div class="small"><b>Note:</b> ${esc(a.notes)}</div>` : ''}
+        <div class="row" style="margin-top:8px">
+          ${accepted ? '<span class="small muted">Lot already taken. Reject or remove the vendor first.</span>'
+            : `<button class="btn btn-sm" data-accept="${a.application_id}">Accept</button>`}
+          <button class="btn btn-danger btn-sm" data-reject="${a.application_id}">Reject</button>
+        </div>
+      </div>`).join('');
+
+    const history = apps.filter((a) => a.status === 'rejected' || a.status === 'cancelled');
+    if (history.length) {
+      html += `<details style="margin-top:8px"><summary class="small muted">Earlier applications (${history.length})</summary>
+        ${history.map((a) => `<div class="small" style="margin-top:6px">${esc(a.vendor_name)} ${badge(a.status)}
+          ${a.organizer_note ? `<span class="muted">· ${esc(a.organizer_note)}</span>` : ''}</div>`).join('')}</details>`;
+    }
+
+    const box = document.getElementById('applicants');
+    box.innerHTML = html;
+    box.querySelectorAll('[data-accept]').forEach((b) => { b.onclick = () => decide(b, b.dataset.accept, 'accepted'); });
+    box.querySelectorAll('[data-reject]').forEach((b) => { b.onclick = () => decide(b, b.dataset.reject, 'rejected'); });
+    box.querySelectorAll('[data-revoke]').forEach((b) => { b.onclick = () => revoke(b, b.dataset.revoke); });
+  }
+
+  async function decide(btn, appId, decision) {
+    const note = await Modal.prompt(
+      decision === 'accepted' ? 'Give this lot to this vendor? Other applicants for this lot will be rejected automatically.' : 'Reject this application?',
+      { title: decision === 'accepted' ? 'Accept application' : 'Reject application', okText: decision === 'accepted' ? 'Accept' : 'Reject',
+        danger: decision === 'rejected', placeholder: 'Optional note for the vendor' });
+    if (note === null) return;
+    await busy(btn, async () => {
+      try {
+        const r = await api(`/applications/${appId}/decision`, { method: 'PUT', body: { decision, note } });
+        toast(r.message + (r.autoRejected ? ` ${r.autoRejected} other applicant(s) were rejected.` : ''));
+        await refresh();
+      } catch (e) { toast(e.message, 'error'); }
+    });
+  }
+
+  async function revoke(btn, appId) {
+    const note = await Modal.prompt('The vendor will lose this lot and it becomes free again.', { title: 'Remove vendor from lot', okText: 'Remove', danger: true, placeholder: 'Reason (optional)' });
+    if (note === null) return;
+    await busy(btn, async () => {
+      try {
+        const r = await api(`/applications/${appId}/revoke`, { method: 'PUT', body: { note } });
+        toast(r.message);
+        await refresh();
+      } catch (e) { toast(e.message, 'error'); }
+    });
+  }
+
+  async function refresh() {
+    const id = current.event.event_id;
+    events = await api('/events');
+    renderEventCards(document.getElementById('eventStrip'), events, id, pick);
+    renderStats();
+    await loadMap(id);
+    if (openLotId) showLot(openLotId);
+  }
+</script>
+</body>
+</html>
