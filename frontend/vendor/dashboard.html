@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard · PasarKita</title>
+<link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div id="sidebarScrim"></div>
+  <main class="main">
+    <header class="topbar" id="topbar"></header>
+    <div class="content">
+      <div id="welcome"></div>
+      <div class="event-strip" id="eventStrip"></div>
+      <div class="board">
+        <section class="board-map">
+          <div class="card">
+            <div class="map-title">
+              <div><h2 id="mapTitle">Stall map</h2><div class="muted small" id="mapMeta"></div></div>
+              <div id="mapHint" class="small"></div>
+            </div>
+            <div id="map"></div>
+            <div class="legend" id="legend"></div>
+          </div>
+        </section>
+        <aside class="panel">
+          <div class="card" id="lotPanel"></div>
+          <div class="card"><h3>Lots by zone</h3><div id="zones"></div></div>
+        </aside>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="/assets/js/sprites.js"></script>
+<script src="/assets/js/api.js"></script>
+<script src="/assets/js/layout.js"></script>
+<script src="/assets/js/map.js"></script>
+<script>
+  let events = [];
+  let myApps = [];
+  let current = null;
+  const map = new PixelMap(document.getElementById('map'), { onLotClick: clickLot, lotState });
+  renderLegend(document.getElementById('legend'), ['available', 'pending', 'taken', 'mine', 'minepending', 'closed']);
+
+  // My pending/accepted application for an event (a vendor can only have one per event).
+  function activeApp(eventId) {
+    return myApps.find((a) => a.event_id === eventId && (a.status === 'pending' || a.status === 'accepted'));
+  }
+
+  function lotState(lot) {
+    const mine = activeApp(lot.event_id);
+    if (mine && mine.lot_id === lot.lot_id) return mine.status === 'accepted' ? 'mine' : 'minepending';
+    if (lot.vendor_id) return 'taken';
+    if (!current || current.event.phase !== 'upcoming') return 'closed';
+    return lot.pending_count > 0 ? 'pending' : 'available';
+  }
+
+  (async () => {
+    const me = await Layout.init({ role: 'vendor', page: 'dashboard', title: 'Dashboard' });
+    [events, myApps] = await Promise.all([api('/events'), api('/applications/mine')]);
+    renderWelcome(me);
+    renderEventCards(document.getElementById('eventStrip'), events, null, pick);
+    const first = pickDefaultEvent(events);
+    if (first) pick(first);
+    else document.getElementById('map').innerHTML = '<div class="empty-card">No markets are scheduled right now. Check back soon!</div>';
+  })();
+
+  function renderWelcome(me) {
+    const todays = myApps.find((a) => a.status === 'accepted' && a.phase === 'ongoing');
+    const next = myApps.filter((a) => a.status === 'accepted' && a.phase === 'upcoming').sort((a, b) => a.event_date.localeCompare(b.event_date))[0];
+    let html = `<div class="notice notice-info">Hi ${esc(me.name)}! Pick an event below, then click a <b>green</b> or <b>yellow</b> lot to apply for it.</div>`;
+    if (todays) {
+      html = `<div class="notice notice-warn">Today you're at <b>lot ${esc(todays.lot_number)}</b> (${esc(todays.event_name)}).
+        ${todays.attendance === 'unconfirmed' ? '<a href="/vendor/next-event.html">Confirm your arrival time →</a>' : ''}</div>`;
+    } else if (next) {
+      html = `<div class="notice notice-info">Your next market: <b>${esc(next.event_name)}</b> on ${esc(fmtDate(next.event_date))}, lot <b>${esc(next.lot_number)}</b>.
+        <a href="/vendor/next-event.html">See details →</a></div>`;
+    }
+    document.getElementById('welcome').innerHTML = html;
+  }
+
+  async function pick(id) {
+    renderEventCards(document.getElementById('eventStrip'), events, id, pick);
+    current = await api(`/events/${id}/map`);
+    const e = current.event;
+    document.getElementById('mapTitle').textContent = e.name;
+    document.getElementById('mapMeta').textContent = `${fmtDate(e.event_date)} · ${fmtTime(e.start_time)}–${fmtTime(e.end_time)} · ${e.location}`;
+    const mine = activeApp(id);
+    document.getElementById('mapHint').innerHTML = e.phase === 'ongoing'
+      ? badge('ongoing', 'Happening today: applications closed')
+      : mine ? badge(mine.status, mine.status === 'accepted' ? `Your lot: ${mine.lot_number}` : `You applied for ${mine.lot_number}`)
+        : badge('available', 'Open for applications');
+    map.setData(current);
+    renderZoneList(document.getElementById('zones'), current.lots, { stateOf: lotState, onClick: clickLot });
+    showDefaultPanel();
+  }
+
+  function showDefaultPanel() {
+    const mine = activeApp(current.event.event_id);
+    let text = 'Click a green or yellow lot to apply for it.';
+    if (current.event.phase === 'ongoing') text = 'This market is happening today, so applications are closed. Click a lot to see its details.';
+    else if (mine && mine.status === 'accepted') text = `Lot ${mine.lot_number} is yours. Click another free lot to ask to move there.`;
+    else if (mine) text = `You applied for lot ${mine.lot_number}. Wait for the organizer, or cancel it in Applications to choose another lot.`;
+    document.getElementById('lotPanel').innerHTML = `<h3>Lot details</h3><p class="muted">${esc(text)}</p>`;
+  }
+
+  function clickLot(lot) {
+    const st = lotState(lot);
+    const mine = activeApp(lot.event_id);
+    // A free lot and no application for this event yet: go straight to the apply page.
+    if ((st === 'available' || st === 'pending') && !mine) {
+      location.href = `/vendor/apply.html?lot=${lot.lot_id}`;
+      return;
+    }
+    map.highlightLot(lot.lot_id);
+    let action = '';
+    if (st === 'mine') {
+      action = `<p>This is your lot.</p><div class="row"><a class="btn btn-sm" href="/vendor/next-event.html">Next event details</a>
+        <a class="btn btn-ghost btn-sm" href="/vendor/applications.html">Payment &amp; helpers</a></div>`;
+    } else if (st === 'minepending') {
+      action = '<p>You applied for this lot. The organizer hasn\'t decided yet.</p><a class="btn btn-ghost btn-sm" href="/vendor/applications.html">View my application</a>';
+    } else if (st === 'taken') {
+      action = `<p>Taken by <b>${esc(lot.vendor_name || 'another vendor')}</b>.</p>`;
+    } else if (st === 'closed') {
+      action = '<p class="muted">Applications are closed for this event.</p>';
+    } else if (mine && mine.status === 'accepted') {
+      action = `<p>You already have lot <b>${esc(mine.lot_number)}</b>. Want to move here instead?</p>
+        <a class="btn btn-sm" href="/vendor/relocate.html?app=${mine.application_id}&to=${lot.lot_id}">Request relocation to ${esc(lot.lot_number)}</a>`;
+    } else if (mine) {
+      action = `<p>You already applied for lot <b>${esc(mine.lot_number)}</b> in this event. Cancel that application first (in <a href="/vendor/applications.html">Applications</a>) to choose this lot.</p>`;
+    }
+    document.getElementById('lotPanel').innerHTML = `
+      <div class="lot-head"><span class="lot-big st-${st}">${esc(lot.lot_number)}</span>
+        <div><b>${esc(lot.zone || 'Lot')}</b><br><span class="muted small">${LOT_STATE_LABELS[st]}</span></div></div>
+      <dl class="kv"><dt>Size</dt><dd>${esc(lot.size_label || '-')}</dd><dt>Price</dt><dd>${money(lot.price)}</dd>
+        ${lot.pending_count && !lot.vendor_id ? `<dt>Applicants</dt><dd>${lot.pending_count} vendor(s)</dd>` : ''}</dl>
+      ${action}`;
+  }
+</script>
+</body>
+</html>

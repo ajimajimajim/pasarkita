@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Next Event · PasarKita</title>
+<link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div id="sidebarScrim"></div>
+  <main class="main">
+    <header class="topbar" id="topbar"></header>
+    <div class="content">
+      <h2>Your next event</h2>
+      <div id="next"><p class="muted">Loading…</p></div>
+      <div id="later"></div>
+      <h2 style="margin-top:26px">Join an upcoming event</h2>
+      <p class="muted">Choose an event, then pick a lot on its map.</p>
+      <div class="grid-3" id="join"></div>
+    </div>
+  </main>
+</div>
+
+<script src="/assets/js/sprites.js"></script>
+<script src="/assets/js/api.js"></script>
+<script src="/assets/js/layout.js"></script>
+<script>
+  (async () => {
+    await Layout.init({ role: 'vendor', page: 'next-event', title: 'Next Event' });
+    load();
+  })();
+
+  async function load() {
+    const [apps, events] = await Promise.all([api('/applications/mine'), api('/events')]);
+    const accepted = apps.filter((a) => a.status === 'accepted' && (a.phase === 'ongoing' || a.phase === 'upcoming'))
+      .sort((a, b) => a.event_date.localeCompare(b.event_date) || String(a.start_time).localeCompare(String(b.start_time)));
+
+    // (a) Confirm attendance + arrival time for the next event
+    const next = accepted[0];
+    const nextBox = document.getElementById('next');
+    if (!next) {
+      nextBox.innerHTML = '<div class="empty-card">You don\'t have a lot for any upcoming event yet. Pick one below!</div>';
+    } else {
+      const pay = next.payments[0];
+      const defaultArrival = next.arrival_time ? String(next.arrival_time).slice(0, 5) : earlier(next.start_time, 60);
+      nextBox.innerHTML = `
+        <div class="grid-2" style="align-items:start">
+          <div class="card">
+            <div class="lot-head"><span class="lot-big st-mine">${esc(next.lot_number)}</span>
+              <div><h2 style="margin:0">${esc(next.event_name)}</h2>
+              ${next.phase === 'ongoing' ? badge('ongoing', 'Happening today') : badge('upcoming', `In ${daysUntil(next.event_date)} day(s)`)}</div></div>
+            <dl class="kv">
+              <dt>Date</dt><dd>${esc(fmtDate(next.event_date))}</dd>
+              <dt>Time</dt><dd>${fmtTime(next.start_time)} – ${fmtTime(next.end_time)}</dd>
+              <dt>Place</dt><dd>${esc(next.location)}</dd>
+              <dt>Lot</dt><dd>${esc(next.lot_number)} ${next.zone ? `· ${esc(next.zone)}` : ''} ${next.size_label ? `· ${esc(next.size_label)}` : ''}</dd>
+              <dt>Payment</dt><dd>${pay ? badge(pay.status) : '<span style="color:var(--danger)">Not paid yet</span>'}</dd>
+              <dt>Helpers</dt><dd>${next.helperRequests.length ? next.helperRequests.map((h) => `${esc(h.service_type)} ${fmtTime(h.requested_time)} ${badge(h.status)}`).join('<br>') : '<span class="muted">None</span>'}</dd>
+            </dl>
+            <div class="row">
+              <a class="btn btn-ghost btn-sm" href="/vendor/dashboard.html?event=${next.event_id}">See on map</a>
+              <a class="btn btn-ghost btn-sm" href="/vendor/applications.html">Pay / request helper</a>
+              <a class="btn btn-ghost btn-sm" href="/vendor/relocate.html?app=${next.application_id}">Request relocation</a>
+            </div>
+          </div>
+          <div class="card">
+            <h3>Will you be there?</h3>
+            <p class="small muted">Let the organizer know if you're coming and when you'll arrive to unload.</p>
+            <form id="attForm">
+              <label class="row" style="font-weight:600"><input type="radio" name="attendance" value="attending" ${next.attendance !== 'not_attending' ? 'checked' : ''}> Yes, I'm coming</label>
+              <label class="row" style="font-weight:600"><input type="radio" name="attendance" value="not_attending" ${next.attendance === 'not_attending' ? 'checked' : ''}> No, I can't make it</label>
+              <div id="arrivalBox">
+                <label for="arrivalTime">Arrival / loading time</label>
+                <input type="time" id="arrivalTime" name="arrivalTime" value="${esc(defaultArrival)}">
+                <div class="hint">The market opens at ${fmtTime(next.start_time)}.</div>
+              </div>
+              <p class="small" style="margin-top:10px">Current status: ${badge(next.attendance)} ${next.arrival_time ? `· ${fmtTime(next.arrival_time)}` : ''}</p>
+              <div class="form-actions"><button class="btn" type="submit">Save</button></div>
+            </form>
+          </div>
+        </div>`;
+      const form = document.getElementById('attForm');
+      const toggle = () => document.getElementById('arrivalBox').classList.toggle('hidden', form.elements.attendance.value !== 'attending');
+      form.querySelectorAll('[name=attendance]').forEach((r) => { r.onchange = toggle; });
+      toggle();
+      form.onsubmit = async (e) => {
+        e.preventDefault();
+        await busy(form.querySelector('button'), async () => {
+          try {
+            const r = await api(`/applications/${next.application_id}/attendance`, { method: 'PUT', body: formData(form) });
+            toast(r.message);
+            load();
+          } catch (err) { toast(err.message, 'error'); }
+        });
+      };
+    }
+
+    const later = accepted.slice(1);
+    document.getElementById('later').innerHTML = later.length ? `
+      <div class="card"><h3>Also coming up</h3>
+        <table class="table"><tbody>${later.map((a) => `<tr><td><b>${esc(a.event_name)}</b><div class="small muted">${esc(fmtDate(a.event_date))}</div></td>
+          <td>Lot ${esc(a.lot_number)}</td><td>${badge(a.attendance)}</td></tr>`).join('')}</tbody></table></div>` : '';
+
+    // (b) Choose which upcoming event to join
+    const join = document.getElementById('join');
+    const upcoming = events.filter((e) => e.phase === 'upcoming');
+    if (!upcoming.length) { join.innerHTML = '<div class="empty-card">No upcoming events right now.</div>'; return; }
+    join.innerHTML = upcoming.map((e) => {
+      const mine = apps.find((a) => a.event_id === e.event_id && (a.status === 'pending' || a.status === 'accepted'));
+      const free = e.total_lots - e.taken_lots;
+      return `<div class="card" style="margin:0">
+        <div class="event-card-name">${esc(e.name)}</div>
+        <div class="event-card-meta">${esc(fmtDate(e.event_date))} · ${fmtTime(e.start_time)}–${fmtTime(e.end_time)}</div>
+        <div class="event-card-meta">${esc(e.location)}</div>
+        <p class="small" style="margin:8px 0">${free} of ${e.total_lots} lots free</p>
+        ${mine ? `<div>${badge(mine.status, mine.status === 'accepted' ? `You have lot ${mine.lot_number}` : `You applied for ${mine.lot_number}`)}</div>`
+          : free > 0 ? `<a class="btn btn-sm" href="/vendor/dashboard.html?event=${e.event_id}">Choose a lot</a>` : '<span class="muted small">Full</span>'}
+      </div>`;
+    }).join('');
+  }
+
+  function earlier(time, minutes) {
+    const [h, m] = String(time).split(':').map(Number);
+    const t = Math.max(0, h * 60 + m - minutes);
+    return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
+  }
+
+  function daysUntil(date) {
+    const [y, mo, d] = date.split('-').map(Number);
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    return Math.round((new Date(y, mo - 1, d) - today) / 86400000);
+  }
+</script>
+</body>
+</html>

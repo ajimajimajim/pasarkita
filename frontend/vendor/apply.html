@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Apply for a lot · PasarKita</title>
+<link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div id="sidebarScrim"></div>
+  <main class="main">
+    <header class="topbar" id="topbar"></header>
+    <div class="content">
+      <p><a href="/vendor/dashboard.html" id="backLink">← Back to the map</a></p>
+      <div class="board" id="page"><p class="muted">Loading…</p></div>
+    </div>
+  </main>
+</div>
+
+<script src="/assets/js/sprites.js"></script>
+<script src="/assets/js/api.js"></script>
+<script src="/assets/js/layout.js"></script>
+<script src="/assets/js/map.js"></script>
+<script>
+  (async () => {
+    await Layout.init({ role: 'vendor', page: 'dashboard', title: 'Apply for a lot' });
+    const lotId = Number(qs('lot'));
+    const page = document.getElementById('page');
+    if (!lotId) { page.innerHTML = '<div class="empty-card">No lot chosen. <a href="/vendor/dashboard.html">Go to the map</a>.</div>'; return; }
+
+    let lot;
+    try { lot = await api(`/lots/${lotId}`); } catch (e) { page.innerHTML = `<div class="notice notice-error">${esc(e.message)}</div>`; return; }
+    const [mapData, profile, apps] = await Promise.all([api(`/events/${lot.event_id}/map`), api('/profile'), api('/applications/mine')]);
+    document.getElementById('backLink').href = `/vendor/dashboard.html?event=${lot.event_id}`;
+
+    const mine = apps.find((a) => a.event_id === lot.event_id && (a.status === 'pending' || a.status === 'accepted'));
+    let blocker = '';
+    if (lot.phase === 'ongoing') blocker = 'This market is happening today, so applications are closed.';
+    else if (lot.phase === 'past') blocker = 'This market is already over.';
+    else if (lot.phase === 'cancelled') blocker = 'This market has been cancelled.';
+    else if (lot.vendor_id) blocker = `Lot ${lot.lot_number} has already been given to another vendor.`;
+    else if (mine && mine.status === 'accepted') blocker = `You already have lot ${mine.lot_number} in this event. You can request a relocation instead.`;
+    else if (mine) blocker = `You already applied for lot ${mine.lot_number} in this event. Cancel that application first to apply for this one.`;
+
+    page.innerHTML = `
+      <section>
+        <div class="card">
+          <div class="lot-head"><span class="lot-big st-${lot.pending_count ? 'pending' : 'available'}">${esc(lot.lot_number)}</span>
+            <div><h2 style="margin:0">${esc(lot.event_name)}</h2>
+            <div class="muted small">${esc(fmtDate(lot.event_date))} · ${fmtTime(lot.start_time)}–${fmtTime(lot.end_time)} · ${esc(lot.location)}</div></div></div>
+          <div id="map"></div>
+          <p class="hint">Your chosen lot is blinking on the map.</p>
+        </div>
+      </section>
+      <aside class="panel">
+        <div class="card">
+          <h3>Lot ${esc(lot.lot_number)}</h3>
+          <dl class="kv"><dt>Zone</dt><dd>${esc(lot.zone || '-')}</dd><dt>Size</dt><dd>${esc(lot.size_label || '-')}</dd>
+            <dt>Price</dt><dd>${money(lot.price)}</dd><dt>Applicants</dt><dd>${lot.pending_count ? `${lot.pending_count} other vendor(s)` : 'None yet'}</dd></dl>
+        </div>
+        <div class="card">
+          <h3>Your application</h3>
+          ${blocker ? `<div class="notice notice-warn">${esc(blocker)}</div>
+            ${mine && mine.status === 'accepted' && !lot.vendor_id && lot.phase === 'upcoming'
+              ? `<a class="btn btn-block" href="/vendor/relocate.html?app=${mine.application_id}&to=${lot.lot_id}">Request relocation to ${esc(lot.lot_number)}</a>`
+              : '<a class="btn btn-ghost btn-block" href="/vendor/applications.html">Go to my applications</a>'}` : `
+          <form id="applyForm">
+            <label for="goodsDescription">What will you sell here?</label>
+            <input type="text" id="goodsDescription" name="goodsDescription" maxlength="255" value="${esc(profile.goods_type || '')}">
+            <label for="notes">Note for the organizer</label>
+            <textarea id="notes" name="notes" rows="3" maxlength="500" placeholder="e.g. I need electricity, I arrive by lorry…"></textarea>
+            <p class="hint">Applying as <b>${esc(profile.name)}</b> (${esc(profile.contact_number)}). You can change this in My Profile.</p>
+            <div class="form-actions"><button class="btn btn-block" type="submit">Apply for lot ${esc(lot.lot_number)}</button></div>
+          </form>`}
+        </div>
+      </aside>`;
+
+    const map = new PixelMap(document.getElementById('map'), {
+      lotState: (l) => (l.lot_id === lot.lot_id ? (l.pending_count ? 'pending' : 'available') : l.vendor_id ? 'taken' : 'closed'),
+      onLotClick: (l) => { if (l.lot_id !== lot.lot_id && !l.vendor_id && lot.phase === 'upcoming') location.href = `/vendor/apply.html?lot=${l.lot_id}`; },
+    });
+    map.setData(mapData);
+    map.highlightLot(lot.lot_id);
+
+    const form = document.getElementById('applyForm');
+    if (form) {
+      form.onsubmit = async (e) => {
+        e.preventDefault();
+        await busy(form.querySelector('button'), async () => {
+          try {
+            await api('/applications', { method: 'POST', body: { lotId: lot.lot_id, ...formData(form) } });
+            location.href = '/vendor/applications.html?applied=1';
+          } catch (err) { toast(err.message, 'error'); }
+        });
+      };
+    }
+  })();
+</script>
+</body>
+</html>

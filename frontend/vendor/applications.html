@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Applications · PasarKita</title>
+<link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div id="sidebarScrim"></div>
+  <main class="main">
+    <header class="topbar" id="topbar"></header>
+    <div class="content">
+      <div id="flash"></div>
+      <h2>Active applications</h2>
+      <div id="active"><p class="muted">Loading…</p></div>
+      <h2 style="margin-top:26px">History</h2>
+      <div id="history"></div>
+    </div>
+  </main>
+</div>
+
+<script src="/assets/js/sprites.js"></script>
+<script src="/assets/js/api.js"></script>
+<script src="/assets/js/layout.js"></script>
+<script>
+  if (qs('applied')) document.getElementById('flash').innerHTML = '<div class="notice notice-info">Application sent! The organizer will review it. You will see the result here.</div>';
+  if (qs('relocated')) document.getElementById('flash').innerHTML = '<div class="notice notice-info">Relocation request sent. The organizer will review it.</div>';
+
+  (async () => {
+    await Layout.init({ role: 'vendor', page: 'applications', title: 'Applications' });
+    load();
+  })();
+
+  async function load() {
+    const apps = await api('/applications/mine');
+    const isActive = (a) => (a.status === 'pending' || a.status === 'accepted') && (a.phase === 'upcoming' || a.phase === 'ongoing');
+    const active = apps.filter(isActive).sort((a, b) => a.event_date.localeCompare(b.event_date));
+    const history = apps.filter((a) => !isActive(a));
+    document.getElementById('active').innerHTML = active.length ? active.map(card).join('')
+      : '<div class="empty-card">No active applications. <a href="/vendor/dashboard.html">Find a lot on the map</a>.</div>';
+    document.getElementById('history').innerHTML = history.length ? history.map(card).join('') : '<p class="muted">Nothing here yet.</p>';
+    bindActions(apps);
+  }
+
+  function card(a) {
+    const open = a.phase === 'upcoming' || a.phase === 'ongoing';
+    const head = `
+      <div class="card-head">
+        <div class="lot-head" style="margin:0"><span class="lot-big st-${a.status === 'accepted' ? 'mine' : a.status === 'pending' ? 'minepending' : 'closed'}">${esc(a.lot_number || '?')}</span>
+          <div><b>${esc(a.event_name)}</b><div class="small muted">${esc(fmtDate(a.event_date))} · ${fmtTime(a.start_time)}–${fmtTime(a.end_time)} · ${esc(a.location)}</div></div></div>
+        <div>${badge(a.status)} ${a.phase === 'ongoing' ? badge('ongoing', 'Today') : a.phase === 'past' ? badge('past') : a.phase === 'cancelled' ? badge('cancelled', 'Event cancelled') : ''}</div>
+      </div>
+      <div class="small muted">${esc(a.zone || '')} ${a.size_label ? `· ${esc(a.size_label)}` : ''} · ${money(a.price)} · applied ${esc(fmtDateTime(a.created_at))}</div>
+      ${a.organizer_note ? `<div class="small" style="margin-top:6px"><b>Organizer:</b> ${esc(a.organizer_note)}</div>` : ''}`;
+
+    if (a.status === 'pending') {
+      return `<div class="card app-card s-pending">${head}
+        <p class="small" style="margin-top:8px">Waiting for the organizer to decide.</p>
+        ${open ? `<button class="btn btn-ghost btn-sm" data-cancel="${a.application_id}">Cancel application</button>` : ''}</div>`;
+    }
+    if (a.status !== 'accepted') return `<div class="card app-card s-${a.status}">${head}</div>`;
+
+    // Accepted: payment, relocation, helpers
+    const pay = a.payments[0];
+    const canPay = !pay || pay.status === 'rejected';
+    const payHtml = `
+      <div class="section-line"><b>Payment</b>
+        ${pay ? `<div class="small">${badge(pay.status)} ${money(pay.amount)} · <a href="${esc(pay.receipt_file_url)}" target="_blank" rel="noopener">receipt</a>
+          ${pay.review_note ? `· <span class="muted">${esc(pay.review_note)}</span>` : ''}</div>` : '<div class="small muted">Not paid yet.</div>'}
+        ${canPay && a.phase !== 'cancelled' ? `
+        <form class="row pay-form" data-app="${a.application_id}" style="margin-top:8px">
+          <input type="number" name="amount" min="0.01" step="0.01" value="${Number(a.price || 0).toFixed(2)}" required style="width:120px" aria-label="Amount (RM)">
+          <input type="file" name="receipt" accept=".jpg,.jpeg,.png,.pdf" required aria-label="Receipt file">
+          <button class="btn btn-sm" type="submit">${pay ? 'Upload new receipt' : 'Pay &amp; upload receipt'}</button>
+        </form><div class="hint">Upload a photo or PDF of your bank transfer (max 5 MB).</div>` : ''}
+      </div>`;
+
+    const reloc = a.relocations[0];
+    const relocHtml = `
+      <div class="section-line"><b>Relocation</b>
+        ${reloc ? `<div class="small">${badge(reloc.status)} ${esc(reloc.from_lot_number || '?')} → ${esc(reloc.to_lot_number || '?')}
+          ${reloc.organizer_note ? `· <span class="muted">${esc(reloc.organizer_note)}</span>` : ''}</div>` : '<div class="small muted">No relocation requested.</div>'}
+        ${open && a.phase !== 'cancelled' && (!reloc || reloc.status !== 'pending')
+          ? `<a class="btn btn-ghost btn-sm" style="margin-top:8px" href="/vendor/relocate.html?app=${a.application_id}">Request relocation</a>` : ''}
+      </div>`;
+
+    const helpHtml = `
+      <div class="section-line"><b>Helpers</b>
+        ${a.helperRequests.length ? `<table class="table" style="margin-top:4px"><tbody>${a.helperRequests.map((h) => `<tr>
+          <td style="text-transform:capitalize">${esc(h.service_type)}</td><td>${fmtTime(h.requested_time)}</td>
+          <td>${badge(h.status)}</td><td class="small">${h.helper_name ? `${esc(h.helper_name)} · ${esc(h.helper_contact || '')}` : esc(h.organizer_note || '')}</td></tr>`).join('')}</tbody></table>`
+          : '<div class="small muted">No helper requested.</div>'}
+        ${open && a.phase !== 'cancelled' ? `
+        <form class="row help-form" data-app="${a.application_id}" style="margin-top:8px">
+          <select name="serviceType" style="width:auto" aria-label="Helper type"><option value="porter">Porter</option><option value="trolley">Trolley</option></select>
+          <input type="time" name="requestedTime" required style="width:auto" aria-label="Time needed">
+          <input type="text" name="notes" maxlength="500" placeholder="What needs moving?" style="flex:1;min-width:160px">
+          <button class="btn btn-sm" type="submit">Request helper</button>
+        </form>` : ''}
+      </div>`;
+
+    return `<div class="card app-card s-accepted" id="app-${a.application_id}">${head}
+      <div class="small" style="margin-top:6px">Attendance: ${badge(a.attendance)} ${a.arrival_time ? `· arriving ${fmtTime(a.arrival_time)}` : ''}
+        ${open ? '· <a href="/vendor/next-event.html">update</a>' : ''}</div>
+      ${payHtml}${relocHtml}${helpHtml}</div>`;
+  }
+
+  function bindActions() {
+    document.querySelectorAll('[data-cancel]').forEach((b) => {
+      b.onclick = async () => {
+        if (!(await Modal.confirm('Cancel this application? You can then apply for a different lot.', { title: 'Cancel application?', okText: 'Cancel it', danger: true }))) return;
+        await busy(b, async () => {
+          try { toast((await api(`/applications/${b.dataset.cancel}/cancel`, { method: 'PUT' })).message); load(); }
+          catch (e) { toast(e.message, 'error'); }
+        });
+      };
+    });
+
+    // Make Payment «include» Upload Receipt: the receipt file is required.
+    document.querySelectorAll('.pay-form').forEach((f) => {
+      f.onsubmit = async (e) => {
+        e.preventDefault();
+        const fd = new FormData(f);
+        fd.append('applicationId', f.dataset.app);
+        await busy(f.querySelector('button'), async () => {
+          try { toast((await api('/payments', { method: 'POST', form: fd })).message); load(); }
+          catch (err) { toast(err.message, 'error'); }
+        });
+      };
+    });
+
+    document.querySelectorAll('.help-form').forEach((f) => {
+      f.onsubmit = async (e) => {
+        e.preventDefault();
+        await busy(f.querySelector('button'), async () => {
+          try {
+            toast((await api('/helper-requests', { method: 'POST', body: { applicationId: f.dataset.app, ...formData(f) } })).message);
+            load();
+          } catch (err) { toast(err.message, 'error'); }
+        });
+      };
+    });
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Request relocation · PasarKita</title>
+<link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div id="sidebarScrim"></div>
+  <main class="main">
+    <header class="topbar" id="topbar"></header>
+    <div class="content">
+      <p><a href="/vendor/applications.html">← Back to applications</a></p>
+      <div class="board" id="page"><p class="muted">Loading…</p></div>
+    </div>
+  </main>
+</div>
+
+<script src="/assets/js/sprites.js"></script>
+<script src="/assets/js/api.js"></script>
+<script src="/assets/js/layout.js"></script>
+<script src="/assets/js/map.js"></script>
+<script>
+  (async () => {
+    await Layout.init({ role: 'vendor', page: 'applications', title: 'Request relocation' });
+    const page = document.getElementById('page');
+    const apps = await api('/applications/mine');
+    const app = apps.find((a) => a.application_id === Number(qs('app')));
+    if (!app || app.status !== 'accepted') {
+      page.innerHTML = '<div class="empty-card">You can only ask to relocate from a lot you have been given. <a href="/vendor/applications.html">Back to applications</a></div>';
+      return;
+    }
+    if (app.phase === 'past' || app.phase === 'cancelled') {
+      page.innerHTML = '<div class="empty-card">This event is no longer active.</div>';
+      return;
+    }
+    if (app.relocations.some((r) => r.status === 'pending')) {
+      page.innerHTML = '<div class="empty-card">You already have a relocation request waiting. <a href="/vendor/applications.html">Back to applications</a></div>';
+      return;
+    }
+
+    const data = await api(`/events/${app.event_id}/map`);
+    let target = null;
+
+    page.innerHTML = `
+      <section><div class="card">
+        <div class="map-title"><div><h2>${esc(app.event_name)}</h2><div class="muted small">${esc(fmtDate(app.event_date))} · ${esc(app.location)}</div></div></div>
+        <div id="map"></div><div class="legend" id="legend"></div>
+        <p class="hint">Click a free lot (green or yellow) to choose where you want to move.</p>
+      </div></section>
+      <aside class="panel"><div class="card">
+        <h3>Move my stall</h3>
+        <dl class="kv"><dt>Current lot</dt><dd>${esc(app.lot_number)} ${app.zone ? `(${esc(app.zone)})` : ''}</dd>
+          <dt>New lot</dt><dd id="targetLabel" class="muted">Pick on the map</dd></dl>
+        <form id="relocForm">
+          <label for="reason">Why do you want to move?</label>
+          <textarea id="reason" name="reason" rows="3" maxlength="500" placeholder="e.g. Closer to the loading bay"></textarea>
+          <div class="form-actions"><button class="btn btn-block" type="submit" id="sendBtn" disabled>Send relocation request</button></div>
+        </form>
+      </div></aside>`;
+
+    const state = (l) => (l.lot_id === app.lot_id ? 'mine' : l.vendor_id ? 'taken' : l.pending_count ? 'pending' : 'available');
+    renderLegend(document.getElementById('legend'), ['mine', 'available', 'pending', 'taken']);
+    const map = new PixelMap(document.getElementById('map'), { lotState: state, onLotClick: choose });
+    map.setData(data);
+
+    function choose(l) {
+      const st = state(l);
+      if (st === 'mine') { toast('That is your current lot.', 'error'); return; }
+      if (st === 'taken') { toast(`Lot ${l.lot_number} is taken. Pick a free lot.`, 'error'); return; }
+      target = l;
+      map.highlightLot(l.lot_id);
+      document.getElementById('targetLabel').innerHTML = `<b>${esc(l.lot_number)}</b> ${l.zone ? `(${esc(l.zone)})` : ''} · ${esc(l.size_label || '')} · ${money(l.price)}`;
+      document.getElementById('targetLabel').classList.remove('muted');
+      document.getElementById('sendBtn').disabled = false;
+    }
+
+    const pre = data.lots.find((l) => l.lot_id === Number(qs('to')));
+    if (pre && state(pre) !== 'taken' && state(pre) !== 'mine') choose(pre);
+
+    document.getElementById('relocForm').onsubmit = async (e) => {
+      e.preventDefault();
+      if (!target) return;
+      await busy(document.getElementById('sendBtn'), async () => {
+        try {
+          await api('/relocations', { method: 'POST', body: { applicationId: app.application_id, toLotId: target.lot_id, reason: e.target.elements.reason.value } });
+          location.href = '/vendor/applications.html?relocated=1';
+        } catch (err) { toast(err.message, 'error'); }
+      });
+    };
+  })();
+</script>
+</body>
+</html>
