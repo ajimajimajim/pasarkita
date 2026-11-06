@@ -1,0 +1,40 @@
+# PasarKita database (MySQL 8).
+#   Start:  docker compose up -d
+#   Stop:   docker compose down          (keeps your data)
+#   Wipe:   docker compose down -v       (deletes all data)
+# After the first start, run "npm run setup" inside the backend folder to create the tables.
+services:
+  db:
+    image: mysql:8.0
+    container_name: pasarkita-db
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Kuala_Lumpur
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: pasarkita
+      MYSQL_USER: pasarkita_user
+      MYSQL_PASSWORD: pasarkita_pass
+    ports:
+      - "3306:3306"
+    volumes:
+      - pasarkita_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-prootpass"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  phpmyadmin:
+    image: phpmyadmin:5
+    container_name: pasarkita-phpmyadmin
+    restart: unless-stopped
+    environment:
+      PMA_HOST: db
+      PMA_PORT: 3306
+    ports:
+      - "8080:80"
+    depends_on:
+      - db
+
+volumes:
+  pasarkita_data:
