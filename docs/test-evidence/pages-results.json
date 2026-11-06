@@ -1,0 +1,326 @@
+[
+  {
+    "viewport": "Desktop 1440x950",
+    "page": "/index.html",
+    "role": "public",
+    "final_url": "/index.html",
+    "console_errors": 0,
+    "horizontal_scroll": false,
+    "load_ms": 136
+  },
+  {
+    "viewport": "Desktop 1440x950",
+    "page": "/login.html",
+    "role": "public",
+    "final_url": "/login.html",
+    "console_errors": 0,
+    "horizontal_scroll": false,
+    "load_ms": 40
+  },
+  {
+    "viewport": "Desktop 1440x950",
+    "page": "/register.html",
+    "role": "public",
+    "final_url": "/register.html",
+    "console_errors": 0,
+    "horizontal_scroll": false,
+    "load_ms": 35
+  },
+  {
+    "viewport": "Desktop 1440x950",
+    "page": "/404.html",
+    "role": "public",
+    "final_url": "/404.html",
+    "console_errors": 0,
+    "horizontal_scroll": false,
+    "load_ms": 21
+  },
+  {
+    "viewport": "Desktop 1440x950",
+    "page": "/organizer/dashboard.html",
+    "role": "organizer",
+    "final_url": "/organizer/dashboard.html",
+    "console_errors": 0,
+    "horizontal_scroll": false,
+    "load_ms": 47
+  },
+  {
+    "viewport": "Desktop 1440x950",
+    "page": "/organizer/events.html",
+    "role": "organizer",
+    "final_url": "/organizer/events.html",
+    "console_errors": 0,
+    "horizontal_scroll": false,
+    "load_ms": 56
+  },
+  {
+    "viewport": "Desktop 1440x950",
+    "page": "/organizer/map-editor.html",
+    "role": "organizer",
+    "final_url": "/organizer/map-editor.html",
+    "console_errors": 0,
+    "horizontal_scroll": false,
+    "load_ms": 62
+  },
+  {
+    "viewport": "Desktop 1440x950",
+    "page": "/organizer/requests.html",
+    "role": "organizer",
+    "final_url": "/organizer/requests.html",
+    "console_errors": 0,
+    "horizontal_scroll": false,
+    "load_ms": 50
+  },
+  {
+    "viewport": "Desktop 1440x950",
+    "page": "/organizer/vendors.html",
+    "role": "organizer",
+    "final_url": "/organizer/vendors.html",
+    "console_errors": 0,
+    "horizontal_scroll": false,
+    "load_ms": 51
+  },
+  {
+    "viewport": "Desktop 1440x950",
+    "page": "/organizer/helpers.html",
+    "role": "organizer",
+    "final_url": "/organizer/helpers.html",
+    "console_errors": 0,
+    "horizontal_scroll": false,
+    "load_ms": 63
+  },
+  {
+    "viewport": "Desktop 1440x950",
+    "page": "/organizer/reports.html",
+    "role": "organizer",
+    "final_url": "/organizer/reports.html",
+    "console_errors": 0,
+    "horizontal_scroll": false,
+    "load_ms": 48
+  },
+  {
+    "viewport": "Desktop 1440x950",
+    "page": "/organizer/profile.html",
+    "role": "organizer",
+    "final_url": "/organizer/profile.html",
+    "console_errors": 0,
+    "horizontal_scroll": false,
+    "load_ms": 59
+  },
+  {
+    "viewport": "Desktop 1440x950",
+    "page": "/vendor/dashboard.html",
+    "role": "vendor",
+    "final_url": "/vendor/dashboard.html",
+    "console_errors": 0,
+    "horizontal_scroll": false,
+    "load_ms": 49
+  },
+  {
+    "viewport": "Desktop 1440x950",
+    "page": "/vendor/apply.html",
+    "role": "vendor",
+    "final_url": "/vendor/apply.html",
+    "console_errors": 0,
+    "horizontal_scroll": false,
+    "load_ms": 51
+  },
+  {
+    "viewport": "Desktop 1440x950",
+    "page": "/vendor/applications.html",
+    "role": "vendor",
+    "final_url": "/vendor/applications.html",
+    "console_errors": 0,
+    "horizontal_scroll": false,
+    "load_ms": 57
+  },
+  {
+    "viewport": "Desktop 1440x950",
+    "page": "/vendor/next-event.html",
+    "role": "vendor",
+    "final_url": "/vendor/next-event.html",
+    "console_errors": 0,
+    "horizontal_scroll": false,
+    "load_ms": 42
+  },
+  {
+    "viewport": "Desktop 1440x950",
+    "page": "/vendor/profile.html",
+    "role": "vendor",
+    "final_url": "/vendor/profile.html",
+    "console_errors": 0,
+    "horizontal_scroll": false,
+    "load_ms": 61
+  },
+  {
+    "viewport": "Desktop 1440x950",
+    "page": "/vendor/relocate.html",
+    "role": "vendor",
+    "final_url": "/vendor/relocate.html",
+    "console_errors": 0,
+    "horizontal_scroll": false,
+    "load_ms": 65
+  },
+  {
+    "viewport": "Phone 390x844",
+    "page": "/index.html",
+    "role": "public",
+    "final_url": "/index.html",
+    "console_errors": 0,
+    "horizontal_scroll": false,
+    "load_ms": 95
+  },
+  {
+    "viewport": "Phone 390x844",
+    "page": "/login.html",
+    "role": "public",
+    "final_url": "/login.html",
+    "console_errors": 0,
+    "horizontal_scroll": false,
+    "load_ms": 44
+  },
+  {
+    "viewport": "Phone 390x844",
+    "page": "/register.html",
+    "role": "public",
+    "final_url": "/register.html",
+    "console_errors": 0,
+    "horizontal_scroll": false,
+    "load_ms": 24
+  },
+  {
+    "viewport": "Phone 390x844",
+    "page": "/404.html",
+    "role": "public",
+    "final_url": "/404.html",
+    "console_errors": 0,
+    "horizontal_scroll": false,
+    "load_ms": 23
+  },
+  {
+    "viewport": "Phone 390x844",
+    "page": "/organizer/dashboard.html",
+    "role": "organizer",
+    "final_url": "/organizer/dashboard.html",
+    "console_errors": 0,
+    "horizontal_scroll": false,
+    "load_ms": 45
+  },
+  {
+    "viewport": "Phone 390x844",
+    "page": "/organizer/events.html",
+    "role": "organizer",
+    "final_url": "/organizer/events.html",
+    "console_errors": 0,
+    "horizontal_scroll": false,
+    "load_ms": 54
+  },
+  {
+    "viewport": "Phone 390x844",
+    "page": "/organizer/map-editor.html",
+    "role": "organizer",
+    "final_url": "/organizer/map-editor.html",
+    "console_errors": 0,
+    "horizontal_scroll": false,
+    "load_ms": 43
+  },
+  {
+    "viewport": "Phone 390x844",
+    "page": "/organizer/requests.html",
+    "role": "organizer",
+    "final_url": "/organizer/requests.html",
+    "console_errors": 0,
+    "horizontal_scroll": false,
+    "load_ms": 39
+  },
+  {
+    "viewport": "Phone 390x844",
+    "page": "/organizer/vendors.html",
+    "role": "organizer",
+    "final_url": "/organizer/vendors.html",
+    "console_errors": 0,
+    "horizontal_scroll": false,
+    "load_ms": 39
+  },
+  {
+    "viewport": "Phone 390x844",
+    "page": "/organizer/helpers.html",
+    "role": "organizer",
+    "final_url": "/organizer/helpers.html",
+    "console_errors": 0,
+    "horizontal_scroll": false,
+    "load_ms": 33
+  },
+  {
+    "viewport": "Phone 390x844",
+    "page": "/organizer/reports.html",
+    "role": "organizer",
+    "final_url": "/organizer/reports.html",
+    "console_errors": 0,
+    "horizontal_scroll": false,
+    "load_ms": 27
+  },
+  {
+    "viewport": "Phone 390x844",
+    "page": "/organizer/profile.html",
+    "role": "organizer",
+    "final_url": "/organizer/profile.html",
+    "console_errors": 0,
+    "horizontal_scroll": false,
+    "load_ms": 38
+  },
+  {
+    "viewport": "Phone 390x844",
+    "page": "/vendor/dashboard.html",
+    "role": "vendor",
+    "final_url": "/vendor/dashboard.html",
+    "console_errors": 0,
+    "horizontal_scroll": false,
+    "load_ms": 39
+  },
+  {
+    "viewport": "Phone 390x844",
+    "page": "/vendor/apply.html",
+    "role": "vendor",
+    "final_url": "/vendor/apply.html",
+    "console_errors": 0,
+    "horizontal_scroll": false,
+    "load_ms": 34
+  },
+  {
+    "viewport": "Phone 390x844",
+    "page": "/vendor/applications.html",
+    "role": "vendor",
+    "final_url": "/vendor/applications.html",
+    "console_errors": 0,
+    "horizontal_scroll": false,
+    "load_ms": 35
+  },
+  {
+    "viewport": "Phone 390x844",
+    "page": "/vendor/next-event.html",
+    "role": "vendor",
+    "final_url": "/vendor/next-event.html",
+    "console_errors": 0,
+    "horizontal_scroll": false,
+    "load_ms": 31
+  },
+  {
+    "viewport": "Phone 390x844",
+    "page": "/vendor/profile.html",
+    "role": "vendor",
+    "final_url": "/vendor/profile.html",
+    "console_errors": 0,
+    "horizontal_scroll": false,
+    "load_ms": 45
+  },
+  {
+    "viewport": "Phone 390x844",
+    "page": "/vendor/relocate.html",
+    "role": "vendor",
+    "final_url": "/vendor/relocate.html",
+    "console_errors": 0,
+    "horizontal_scroll": false,
+    "load_ms": 36
+  }
+]

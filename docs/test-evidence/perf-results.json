@@ -1,0 +1,44 @@
+[
+  {
+    "label": "Public event list (GET /api/events)",
+    "n": 50,
+    "mean": 2.3,
+    "p95": 4.6,
+    "max": 5.6
+  },
+  {
+    "label": "Stall map, 14 lots + 9 facilities (GET /api/events/:id/map)",
+    "n": 50,
+    "mean": 2.6,
+    "p95": 4.7,
+    "max": 8.1
+  },
+  {
+    "label": "Vendor's applications (GET /api/applications/mine)",
+    "n": 50,
+    "mean": 4.6,
+    "p95": 7.3,
+    "max": 21.1
+  },
+  {
+    "label": "Organizer badge counts (GET /api/stats/counts)",
+    "n": 50,
+    "mean": 2.7,
+    "p95": 7.3,
+    "max": 8.9
+  },
+  {
+    "label": "Generate event report (GET /api/reports/:id/generate)",
+    "n": 50,
+    "mean": 4.5,
+    "p95": 6,
+    "max": 8.1
+  },
+  {
+    "label": "Log in, includes password hash check (POST /api/auth/login)",
+    "n": 20,
+    "mean": 91.5,
+    "p95": 109.6,
+    "max": 114.1
+  }
+]

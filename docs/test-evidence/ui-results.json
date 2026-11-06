@@ -1,0 +1,271 @@
+{
+  "cases": [
+    {
+      "id": "TC-U01",
+      "module": "Authentication",
+      "condition": "Type a wrong password on the login page",
+      "expected": "Red message \"Wrong username or password.\" and stays on login page",
+      "actual": "Wrong username or password.",
+      "pass": true
+    },
+    {
+      "id": "TC-U02",
+      "module": "Authentication",
+      "condition": "Log in as organizer1",
+      "expected": "Opens the organizer dashboard",
+      "actual": "/organizer/dashboard.html",
+      "pass": true
+    },
+    {
+      "id": "TC-U03",
+      "module": "Authentication",
+      "condition": "While logged in as organizer, type the vendor dashboard address /vendor/dashboard.html",
+      "expected": "Vendor page is refused; user is returned to the organizer dashboard",
+      "actual": "/organizer/dashboard.html",
+      "pass": true
+    },
+    {
+      "id": "TC-U04",
+      "module": "Map editor",
+      "condition": "Drag lot G1 about 10% of the map width to the left",
+      "expected": "X position changes from 61% to about 51%; \"Save map\" becomes clickable",
+      "actual": "X = 51.0%; Save map enabled = True",
+      "pass": true
+    },
+    {
+      "id": "TC-U05",
+      "module": "Map editor",
+      "condition": "Drag the white corner handle of G1 outwards by about 4%",
+      "expected": "Width grows from 9% to about 13%",
+      "actual": "Width = 13.0%",
+      "pass": true
+    },
+    {
+      "id": "TC-U06",
+      "module": "Map editor",
+      "condition": "Click \"+ Add lot\"",
+      "expected": "A new lot appears with the next free number (L15) and is selected",
+      "actual": "New lot number = L15",
+      "pass": true
+    },
+    {
+      "id": "TC-U07",
+      "module": "Map editor",
+      "condition": "Click the \"Stage\" facility button",
+      "expected": "A stage icon is placed on the map",
+      "actual": "1 stage on map",
+      "pass": true
+    },
+    {
+      "id": "TC-U08",
+      "module": "Map editor",
+      "condition": "Click \"Save map\", then reload the data from the server",
+      "expected": "G1 keeps its ID with new position, size label and RM55 price; X1 saved in zone \"Special\"",
+      "actual": "G1 x=51%, w=13%, size=\"12ft x 12ft\", RM55; X1 zone=\"Special\"",
+      "pass": true
+    },
+    {
+      "id": "TC-U09",
+      "module": "Map editor",
+      "condition": "Select lot R1 (has an applicant) and press Delete",
+      "expected": "Lot stays; error message explains why",
+      "actual": "Lot R1 has a vendor or applicants, so it can't be deleted. Handle them in Requests first.",
+      "pass": true
+    },
+    {
+      "id": "TC-U10",
+      "module": "Map editor",
+      "condition": "Delete free lot X1, then click \"Undo changes\"",
+      "expected": "X1 disappears, then comes back after undo",
+      "actual": "after delete: gone; after undo: 1 on map",
+      "pass": true
+    },
+    {
+      "id": "TC-U11",
+      "module": "Map editor",
+      "condition": "Upload a venue picture (PNG)",
+      "expected": "Picture becomes the map background and is saved",
+      "actual": "map_image_url = /uploads/maps/maps-1793379440487-639317.png",
+      "pass": true
+    },
+    {
+      "id": "TC-U12",
+      "module": "Vendor dashboard",
+      "condition": "vendor6 opens the Weekend Family Bazaar map and clicks free lot R6",
+      "expected": "Goes straight to the apply page for R6",
+      "actual": "/vendor/apply.html?lot=23",
+      "pass": true
+    },
+    {
+      "id": "TC-U13",
+      "module": "Stall application",
+      "condition": "Submit the application form for R6",
+      "expected": "Applications page shows R6 as Pending",
+      "actual": "1 pending card(s); R6 shown",
+      "pass": true
+    },
+    {
+      "id": "TC-U14",
+      "module": "Vendor dashboard",
+      "condition": "Return to the map",
+      "expected": "R6 is drawn as \"You applied\" (light blue, dashed border)",
+      "actual": "R6 drawn as You applied (light blue, dashed)",
+      "pass": true
+    },
+    {
+      "id": "TC-U15",
+      "module": "Vendor dashboard",
+      "condition": "Click another free lot (R5) in the same event",
+      "expected": "Stays on the map; panel says she already applied for R6",
+      "actual": "Panel: \"You already applied for lot R6 in this event. Cancel that application first (in Applications) to choose this lot.\"",
+      "pass": true
+    },
+    {
+      "id": "TC-U16",
+      "module": "Organizer dashboard",
+      "condition": "Organizer opens the same event map",
+      "expected": "R6 is yellow with a red \"1\" applicant badge",
+      "actual": "badge = \"1\"; R6 drawn as Has applicants (yellow)",
+      "pass": true
+    },
+    {
+      "id": "TC-U17",
+      "module": "Organizer dashboard",
+      "condition": "Click lot R6",
+      "expected": "Side panel lists Farah Batik with her note \"Need shade\" and Accept/Reject buttons",
+      "actual": "Panel: \"Farah Batik Batik clothing \u00b7 018-444 9090 \u00b7 applied 31 Oct, 12:57 am Selling: Batik clothing Note: Need shade Accept Reject\"; Accept buttons: 1, Reject buttons: 1",
+      "pass": true
+    },
+    {
+      "id": "TC-U18",
+      "module": "Organizer dashboard",
+      "condition": "Click Accept and confirm with note \"Welcome!\"",
+      "expected": "R6 turns red (taken); panel shows Farah as the vendor on the lot",
+      "actual": "R6 drawn as Taken (red)",
+      "pass": true
+    },
+    {
+      "id": "TC-U19",
+      "module": "Payment",
+      "condition": "Upload a receipt with the pre-filled amount (RM60.00) and click Pay",
+      "expected": "Payment shows Pending, RM 60.00, with a receipt link",
+      "actual": "Payment section: \"Payment Pending RM 60.00 \u00b7 receipt\"; receipt links: 1",
+      "pass": true
+    },
+    {
+      "id": "TC-U20",
+      "module": "Helper management",
+      "condition": "Request a trolley helper for 7:20 AM",
+      "expected": "Request listed under Helpers as Trolley, 7:20 AM, Pending",
+      "actual": "Helpers table: \"Trolley 7:20 AM Pending\"",
+      "pass": true
+    },
+    {
+      "id": "TC-U21",
+      "module": "Attendance",
+      "condition": "On Next Event, choose \"Yes, I'm coming\", set arrival 6:45 AM and save",
+      "expected": "Status changes to Attending, 6:45 AM",
+      "actual": "Page shows: \"Current status: Attending \u00b7 6:45 AM\"",
+      "pass": true
+    },
+    {
+      "id": "TC-U22",
+      "module": "Relocation",
+      "condition": "On the relocation map, click taken lot R4, then free lot R3",
+      "expected": "R4 is refused (button stays disabled); R3 is accepted as the new lot",
+      "actual": "after R4: send disabled = True; after R3: send enabled = True",
+      "pass": true
+    },
+    {
+      "id": "TC-U23",
+      "module": "Relocation",
+      "condition": "Send the relocation request",
+      "expected": "Applications page shows Pending R6 \u2192 R3",
+      "actual": "Relocation section: \"Relocation Pending R6 \u2192 R3\"",
+      "pass": true
+    },
+    {
+      "id": "TC-U24",
+      "module": "Requests page",
+      "condition": "Payments tab: click Verify on Farah's payment",
+      "expected": "Payment leaves the waiting list",
+      "actual": "waiting payments 3 \u2192 2",
+      "pass": true
+    },
+    {
+      "id": "TC-U25",
+      "module": "Requests page",
+      "condition": "Relocations tab: approve Farah's move R6 \u2192 R3",
+      "expected": "Farah is on R3 and R6 is free",
+      "actual": "R3 = Farah Batik; R6 = free",
+      "pass": true
+    },
+    {
+      "id": "TC-U26",
+      "module": "Requests page",
+      "condition": "Helpers tab: assign the first available helper to Farah",
+      "expected": "Request status becomes Assigned with the helper's name",
+      "actual": "Status cell: Assigned Farid",
+      "pass": true
+    },
+    {
+      "id": "TC-U27",
+      "module": "Requests page",
+      "condition": "Applications tab: reject Nurul Burger Bakar with note \"Zone full\"",
+      "expected": "Application leaves the waiting list",
+      "actual": "Nurul Burger rows in pending list: 1 \u2192 0; message: \"Application rejected.\"",
+      "pass": true
+    },
+    {
+      "id": "TC-U28",
+      "module": "Reports",
+      "condition": "Reports page: generate the report for today's event",
+      "expected": "Shows 4/14 lots taken and RM 140.00 verified",
+      "actual": "First two tiles: \"4/14 Lots taken (29%) | RM 140.00 Verified payments\"",
+      "pass": true
+    },
+    {
+      "id": "TC-U29",
+      "module": "Reports",
+      "condition": "After generating, check the Print button",
+      "expected": "Print button becomes clickable",
+      "actual": "Print enabled = True",
+      "pass": true
+    },
+    {
+      "id": "TC-U30",
+      "module": "Event management",
+      "condition": "Create event \"UI Test Market\"",
+      "expected": "Opens the map editor for the new event with an empty map",
+      "actual": "0 lots on new map",
+      "pass": true
+    },
+    {
+      "id": "TC-U31",
+      "module": "Event management",
+      "condition": "Use \"Copy layout from\u2026\" to copy another event's map, then save",
+      "expected": "All copied lots are saved to the new event",
+      "actual": "14 lots copied, 14 saved",
+      "pass": true
+    },
+    {
+      "id": "TC-U32",
+      "module": "Profile",
+      "condition": "Organizer changes phone number on My Profile",
+      "expected": "Message \"Profile saved.\" appears and the new number is stored",
+      "actual": "Message: \"Profile saved.\"; stored phone: 012-999 0000",
+      "pass": true
+    },
+    {
+      "id": "TC-U33",
+      "module": "Event management",
+      "condition": "Events page: click Edit on \"PasarKita Night Market\"",
+      "expected": "The form fills with that event's name and date (check for defect D6)",
+      "actual": "Name box = \"PasarKita Night Market\"; date box = 2026-10-31",
+      "pass": true
+    }
+  ],
+  "js_errors": [
+    "console Failed to load resource: the server responded with a status of 401 (Unauthorized) @ page=/login.html resource=/api/auth/login"
+  ]
+}

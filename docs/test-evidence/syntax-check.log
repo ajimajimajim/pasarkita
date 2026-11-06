@@ -1,0 +1,47 @@
+Syntax check run at 2026-10-31 00:57 +08
+OK  backend/src/controllers/reportController.js
+OK  backend/src/controllers/profileController.js
+OK  backend/src/controllers/paymentController.js
+OK  backend/src/controllers/relocationController.js
+OK  backend/src/controllers/applicationController.js
+OK  backend/src/controllers/authController.js
+OK  backend/src/controllers/helperController.js
+OK  backend/src/controllers/eventController.js
+OK  backend/src/controllers/statsController.js
+OK  backend/src/controllers/vendorController.js
+OK  backend/src/config/db.js
+OK  backend/src/config/setup.js
+OK  backend/src/middleware/errorHandler.js
+OK  backend/src/middleware/upload.js
+OK  backend/src/middleware/auth.js
+OK  backend/src/server.js
+OK  backend/src/utils/asyncHandler.js
+OK  backend/src/utils/validate.js
+OK  backend/src/utils/httpError.js
+OK  backend/src/utils/transaction.js
+OK  backend/src/utils/dates.js
+OK  backend/src/routes/index.js
+OK  backend/tests/api-test.mjs
+OK  frontend/assets/js/api.js
+OK  frontend/assets/js/layout.js
+OK  frontend/assets/js/map.js
+OK  frontend/assets/js/profile-page.js
+OK  frontend/assets/js/sprites.js
+OK  frontend/login.html (1 inline script)
+OK  frontend/404.html (0 inline script)
+OK  frontend/index.html (1 inline script)
+OK  frontend/organizer/profile.html (1 inline script)
+OK  frontend/organizer/map-editor.html (1 inline script)
+OK  frontend/organizer/dashboard.html (1 inline script)
+OK  frontend/organizer/requests.html (1 inline script)
+OK  frontend/organizer/vendors.html (1 inline script)
+OK  frontend/organizer/reports.html (1 inline script)
+OK  frontend/organizer/helpers.html (1 inline script)
+OK  frontend/organizer/events.html (1 inline script)
+OK  frontend/vendor/profile.html (1 inline script)
+OK  frontend/vendor/applications.html (1 inline script)
+OK  frontend/vendor/relocate.html (1 inline script)
+OK  frontend/vendor/dashboard.html (1 inline script)
+OK  frontend/vendor/apply.html (1 inline script)
+OK  frontend/vendor/next-event.html (1 inline script)
+OK  frontend/register.html (1 inline script)

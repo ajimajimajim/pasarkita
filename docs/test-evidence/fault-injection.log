@@ -1,0 +1,22 @@
+=== Fault injection run 2026-10-31 00:58 +08 ===
+
+--- F1: backend/.env missing (JWT_SECRET not set) ---
+$ JWT_SECRET= node src/server.js
+JWT_SECRET is missing. Copy backend/.env.example to backend/.env first.
+(exit code 1)
+
+--- F2: database server shut down while the website is running ---
+Before: GET /api/events -> HTTP 200
+$ mariadb-admin shutdown   (simulates stopping the Docker database container)
+During: GET /api/events -> {"error":"Cannot reach the database. Is MySQL running and is .env correct?"} [HTTP 503]
+Server log: Database connection problem: ECONNREFUSED connect ECONNREFUSED 127.0.0.1:3306
+$ (database started again; website NOT restarted)
+After:  GET /api/events -> HTTP 200
+
+--- F3: wrong database password in .env ---
+GET /api/events -> {"error":"Cannot reach the database. Is MySQL running and is .env correct?"} [HTTP 503]
+Server log: Database connection problem: ER_ACCESS_DENIED_ERROR Access denied for user 'pasarkita_user'@'localhost' (using password: YES)
+
+--- F4: tables never created (empty database) ---
+GET /api/events -> {"error":"Database tables are missing. Run \"npm run setup\" first."} [HTTP 503]
+Server log: Table 'pk_empty.market_events' doesn't exist

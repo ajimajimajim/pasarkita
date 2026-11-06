@@ -1,0 +1,730 @@
+[
+  {
+    "id": "TC-A01",
+    "module": "Public view",
+    "condition": "Visitor (no login) opens the event list",
+    "expected": "Only today's and upcoming events are listed (3 of 4 seeded events; the past event is hidden)",
+    "actual": "HTTP 200 - 3 events: ongoing, upcoming, upcoming",
+    "pass": true
+  },
+  {
+    "id": "TC-A02",
+    "module": "Public view",
+    "condition": "Visitor opens the stall map of the Weekend Family Bazaar",
+    "expected": "Map returns all 14 lots and 9 facilities with each lot's applicant count",
+    "actual": "HTTP 200 - 14 lots, 9 facilities",
+    "pass": true
+  },
+  {
+    "id": "TC-A03",
+    "module": "Public view",
+    "condition": "Lot G2 has two vendors applying",
+    "expected": "pending_count for G2 = 2",
+    "actual": "pending_count = 2",
+    "pass": true
+  },
+  {
+    "id": "TC-A04",
+    "module": "Public view",
+    "condition": "Request the map of an event ID that does not exist (999)",
+    "expected": "HTTP 404 \"Event not found.\"",
+    "actual": "HTTP 404 - \"Event not found.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A05",
+    "module": "Authentication",
+    "condition": "Log in with each of the 7 demo accounts (organizer1, vendor1-vendor6)",
+    "expected": "Every login returns a token",
+    "actual": "7 of 7 tokens issued",
+    "pass": true
+  },
+  {
+    "id": "TC-A06",
+    "module": "Authentication",
+    "condition": "Log in with a wrong password",
+    "expected": "HTTP 401 with a message that does not reveal which field was wrong",
+    "actual": "HTTP 401 - \"Wrong username or password.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A07",
+    "module": "Authentication",
+    "condition": "Register with a 5-character password (boundary: minimum is 8)",
+    "expected": "HTTP 400, account not created",
+    "actual": "HTTP 400 - \"Password must be at least 8 characters.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A08",
+    "module": "Authentication",
+    "condition": "Register with a username containing a space and \"!\"",
+    "expected": "HTTP 400, account not created",
+    "actual": "HTTP 400 - \"Username must be 3-50 characters: letters, numbers, _ or . only.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A09",
+    "module": "Authentication",
+    "condition": "Register a new vendor with valid details",
+    "expected": "HTTP 201, account created",
+    "actual": "HTTP 201 - \"Registration successful. You can now log in.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A10",
+    "module": "Authentication",
+    "condition": "Register again with the same username",
+    "expected": "HTTP 409 \"That username is already taken.\"",
+    "actual": "HTTP 409 - \"That username is already taken.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A11",
+    "module": "Authentication",
+    "condition": "Log in with the newly registered account",
+    "expected": "Login succeeds",
+    "actual": "Token issued",
+    "pass": true
+  },
+  {
+    "id": "TC-A12",
+    "module": "Authentication",
+    "condition": "vendor1 asks \"who am I\" with its token",
+    "expected": "Returns role vendor, name Kak Siti Kuih",
+    "actual": "role=vendor, name=Kak Siti Kuih",
+    "pass": true
+  },
+  {
+    "id": "TC-A13",
+    "module": "Access control",
+    "condition": "Vendor calls the organizer-only vendor list",
+    "expected": "HTTP 403",
+    "actual": "HTTP 403 - \"You do not have permission to do this.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A14",
+    "module": "Access control",
+    "condition": "Call an organizer route with no login token",
+    "expected": "HTTP 401",
+    "actual": "HTTP 401 - \"Please log in first.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A15",
+    "module": "Access control",
+    "condition": "Call an organizer route with a fake token",
+    "expected": "HTTP 401",
+    "actual": "HTTP 401 - \"Your session has expired. Please log in again.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A16",
+    "module": "Access control",
+    "condition": "Organizer tries to apply for a lot (vendor-only action)",
+    "expected": "HTTP 403",
+    "actual": "HTTP 403 - \"You do not have permission to do this.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A17",
+    "module": "Stall application",
+    "condition": "vendor6 (no applications) applies for free lot G3 in an upcoming event",
+    "expected": "HTTP 201, application saved as pending",
+    "actual": "HTTP 201 - \"Application sent. The organizer will review it.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A18",
+    "module": "Stall application",
+    "condition": "vendor6 applies for a second lot (G4) in the same event",
+    "expected": "HTTP 409: only one pending/accepted lot per vendor per event",
+    "actual": "HTTP 409 - \"You already applied for lot G3 in this event. Cancel that application first to choose a different lot.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A19",
+    "module": "Stall application",
+    "condition": "Apply for lot G1, which already has a vendor",
+    "expected": "HTTP 409 \"already taken\"",
+    "actual": "HTTP 409 - \"Lot G1 is already taken. Please choose another lot.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A20",
+    "module": "Stall application",
+    "condition": "Apply for free lot G1 in the event happening today",
+    "expected": "HTTP 400: applications close on the event day",
+    "actual": "HTTP 400 - \"Applications are closed: this event is happening today.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A21",
+    "module": "Stall application",
+    "condition": "vendor1, who already has lot G1 in this event, applies for G5",
+    "expected": "HTTP 409 telling the vendor to use relocation instead",
+    "actual": "HTTP 409 - \"You already have lot G1 for this event. Use \"Request relocation\" to move.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A22",
+    "module": "Stall application",
+    "condition": "vendor5 tries to cancel vendor6's application",
+    "expected": "HTTP 404 (vendors cannot see others' applications)",
+    "actual": "HTTP 404 - \"Application not found.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A23",
+    "module": "Application review",
+    "condition": "Organizer opens the applicant list for lot G2",
+    "expected": "Two pending applicants are listed",
+    "actual": "2 pending: Ahmad Fresh Fruit, Raju Teh Tarik",
+    "pass": true
+  },
+  {
+    "id": "TC-A24",
+    "module": "Application review",
+    "condition": "Organizer accepts Ahmad Fresh Fruit for G2",
+    "expected": "HTTP 200; the other applicant (Raju Teh Tarik) is rejected automatically",
+    "actual": "HTTP 200 - \"Accepted. Lot G2 is now Ahmad Fresh Fruit's.\"; autoRejected = 1",
+    "pass": true
+  },
+  {
+    "id": "TC-A25",
+    "module": "Application review",
+    "condition": "Organizer tries to accept the auto-rejected applicant",
+    "expected": "HTTP 409: application is no longer pending",
+    "actual": "HTTP 409 - \"This application is already rejected.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A26",
+    "module": "Application review",
+    "condition": "Send a decision value other than accepted/rejected",
+    "expected": "HTTP 400",
+    "actual": "HTTP 400 - \"Decision must be accepted or rejected.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A27",
+    "module": "Application review",
+    "condition": "Raju Teh Tarik (vendor4) checks his applications",
+    "expected": "Shows \"rejected\" with the reason \"Lot was given to another vendor.\"",
+    "actual": "status=rejected, note=\"Lot was given to another vendor.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A28",
+    "module": "Application review",
+    "condition": "vendor4 applies for another lot (R3) after being rejected",
+    "expected": "HTTP 201 (a rejected application does not block new ones)",
+    "actual": "HTTP 201 - \"Application sent. The organizer will review it.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A29",
+    "module": "Application review",
+    "condition": "Organizer rejects vendor4's R3 application with a note",
+    "expected": "HTTP 200",
+    "actual": "HTTP 200 - \"Application rejected.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A30",
+    "module": "Relocation",
+    "condition": "Organizer lists pending relocation requests",
+    "expected": "One request: Mei Ling Crafts, R4 to R5",
+    "actual": "1 request(s): Mei Ling Crafts, R4 -> R5",
+    "pass": true
+  },
+  {
+    "id": "TC-A31",
+    "module": "Relocation",
+    "condition": "Mei Ling sends a second relocation request while one is pending",
+    "expected": "HTTP 409",
+    "actual": "HTTP 409 - \"You already have a relocation request waiting. Wait for the organizer to decide.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A32",
+    "module": "Relocation",
+    "condition": "vendor1 asks to move to G2, which now has a vendor",
+    "expected": "HTTP 409: can only move to a free lot",
+    "actual": "HTTP 409 - \"Lot G2 is already taken. Choose a free lot.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A33",
+    "module": "Relocation",
+    "condition": "Organizer approves Mei Ling's move R4 to R5",
+    "expected": "HTTP 200",
+    "actual": "HTTP 200 - \"Approved. Mei Ling Crafts moved to lot R5.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A34",
+    "module": "Relocation",
+    "condition": "Check the map after approval",
+    "expected": "R4 is free; R5 belongs to Mei Ling Crafts",
+    "actual": "R4 vendor=none, R5 vendor=Mei Ling Crafts",
+    "pass": true
+  },
+  {
+    "id": "TC-A35",
+    "module": "Helper management",
+    "condition": "Organizer lists pending helper requests",
+    "expected": "One request: Mei Ling Crafts, porter at 7:15 AM",
+    "actual": "1 request(s): Mei Ling Crafts, porter 07:15:00",
+    "pass": true
+  },
+  {
+    "id": "TC-A36",
+    "module": "Helper management",
+    "condition": "Set helper Kumar to off duty",
+    "expected": "HTTP 200",
+    "actual": "HTTP 200 - \"Helper updated.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A37",
+    "module": "Helper management",
+    "condition": "Assign off-duty Kumar to the request",
+    "expected": "HTTP 409 \"Kumar is off duty.\"",
+    "actual": "HTTP 409 - \"Kumar is off duty.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A38",
+    "module": "Helper management",
+    "condition": "Assign available helper Razak",
+    "expected": "HTTP 200 \"Razak assigned.\"",
+    "actual": "HTTP 200 - \"Razak assigned.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A39",
+    "module": "Helper management",
+    "condition": "Delete Razak while he has an assigned job",
+    "expected": "HTTP 409",
+    "actual": "HTTP 409 - \"This helper has assigned jobs. Mark them off duty instead, or reassign the jobs first.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A40",
+    "module": "Helper management",
+    "condition": "Mark Razak's job as done",
+    "expected": "HTTP 200",
+    "actual": "HTTP 200 - \"Marked as done.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A41",
+    "module": "Helper management",
+    "condition": "Vendor with an accepted lot requests a trolley helper at 7:30 AM",
+    "expected": "HTTP 201",
+    "actual": "HTTP 201 - \"Helper request sent.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A42",
+    "module": "Helper management",
+    "condition": "Vendor with only a pending application requests a helper",
+    "expected": "HTTP 400",
+    "actual": "HTTP 400 - \"You can only request a helper for a lot you have been given.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A43",
+    "module": "Helper management",
+    "condition": "Request helper type \"robot\" (not porter/trolley)",
+    "expected": "HTTP 400",
+    "actual": "HTTP 400 - \"Service type must be porter or trolley.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A44",
+    "module": "Helper management",
+    "condition": "Organizer adds a new helper",
+    "expected": "HTTP 201",
+    "actual": "HTTP 201 - \"Helper added.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A45",
+    "module": "Helper management",
+    "condition": "Delete a helper with no jobs",
+    "expected": "HTTP 200",
+    "actual": "HTTP 200 - \"Helper removed.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A46",
+    "module": "Payment",
+    "condition": "Vendor pays RM60 with a PNG receipt for an accepted lot",
+    "expected": "HTTP 201, payment pending verification",
+    "actual": "HTTP 201 - \"Payment sent. Waiting for the organizer to verify.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A47",
+    "module": "Payment",
+    "condition": "Pay again while the first payment is still pending",
+    "expected": "HTTP 409",
+    "actual": "HTTP 409 - \"Your payment is still waiting for verification.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A48",
+    "module": "Payment",
+    "condition": "Pay without attaching a receipt (Make Payment includes Upload Receipt)",
+    "expected": "HTTP 400",
+    "actual": "HTTP 400 - \"Please attach your receipt (JPG, PNG or PDF).\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A49",
+    "module": "Payment",
+    "condition": "Attach a .txt file as the receipt",
+    "expected": "HTTP 400: only JPG, PNG or PDF",
+    "actual": "HTTP 400 - \"Receipt must be a JPG, PNG or PDF file.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A50",
+    "module": "Payment",
+    "condition": "Pay for an application that is still pending",
+    "expected": "HTTP 400",
+    "actual": "HTTP 400 - \"You can only pay for a lot you have been given.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A51",
+    "module": "Payment",
+    "condition": "Organizer rejects the payment with note \"Receipt is blurry\"",
+    "expected": "HTTP 200",
+    "actual": "HTTP 200 - \"Payment rejected.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A52",
+    "module": "Payment",
+    "condition": "Vendor uploads a new receipt after the rejection",
+    "expected": "HTTP 201",
+    "actual": "HTTP 201 - \"Payment sent. Waiting for the organizer to verify.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A53",
+    "module": "Payment",
+    "condition": "Organizer verifies the new payment",
+    "expected": "HTTP 200 \"Payment verified.\"",
+    "actual": "HTTP 200 - \"Payment verified.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A54",
+    "module": "Payment",
+    "condition": "Open the uploaded receipt link",
+    "expected": "File is served (HTTP 200)",
+    "actual": "HTTP 200 /uploads/receipts/receipts-1793379434939-96012.png",
+    "pass": true
+  },
+  {
+    "id": "TC-A55",
+    "module": "Payment",
+    "condition": "Check the upload folder after the failed uploads (.txt and pending application)",
+    "expected": "Only the 2 accepted receipts are stored; rejected uploads are deleted",
+    "actual": "2 new file(s) on disk",
+    "pass": true
+  },
+  {
+    "id": "TC-A56",
+    "module": "Attendance",
+    "condition": "Confirm \"attending\" without an arrival time",
+    "expected": "HTTP 400 \"Please give your arrival time.\"",
+    "actual": "HTTP 400 - \"Please give your arrival time.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A57",
+    "module": "Attendance",
+    "condition": "Confirm \"attending\" with arrival time 7:00 AM",
+    "expected": "HTTP 200 \"Attendance confirmed.\"",
+    "actual": "HTTP 200 - \"Attendance confirmed.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A58",
+    "module": "Attendance",
+    "condition": "Confirm attendance for a pending (not accepted) application",
+    "expected": "HTTP 400",
+    "actual": "HTTP 400 - \"You can only confirm attendance for an accepted lot.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A59",
+    "module": "Stall application",
+    "condition": "vendor6 cancels her pending G3 application",
+    "expected": "HTTP 200",
+    "actual": "HTTP 200 - \"Application cancelled.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A60",
+    "module": "Stall application",
+    "condition": "Cancel the same application again",
+    "expected": "HTTP 400: only pending applications can be cancelled",
+    "actual": "HTTP 400 - \"Only pending applications can be cancelled.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A61",
+    "module": "Application review",
+    "condition": "Organizer removes Ahmad Fresh Fruit from G2",
+    "expected": "HTTP 200 and G2 becomes free on the map",
+    "actual": "HTTP 200 - \"Vendor removed from the lot. The lot is free again.\"; G2 vendor=none",
+    "pass": true
+  },
+  {
+    "id": "TC-A62",
+    "module": "Map editor",
+    "condition": "Save a layout that deletes lot R1, which has a pending applicant",
+    "expected": "HTTP 409, nothing saved",
+    "actual": "HTTP 409 - \"Cannot delete lot R1: a vendor has it or has applied for it. Reject or remove the vendor first.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A63",
+    "module": "Map editor",
+    "condition": "Save a layout where two lots are both numbered R3",
+    "expected": "HTTP 400",
+    "actual": "HTTP 400 - \"Lot number \"R3\" is used twice. Each lot needs a unique number.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A64",
+    "module": "Map editor",
+    "condition": "Save a lot placed at X 95% with width 9% (past the right edge)",
+    "expected": "HTTP 400 \"outside the map\"",
+    "actual": "HTTP 400 - \"Lot R2 is outside the map.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A65",
+    "module": "Map editor",
+    "condition": "Save one layout that swaps R2/R3 numbers, moves G1, deletes free lot G5, adds lot NEW1 and a stage",
+    "expected": "HTTP 200; all five changes stored; R1 keeps its ID and applicant",
+    "actual": "HTTP 200 - \"Map saved.\"; lots=14, facilities=10, G1 x=40, G5 removed, NEW1 added",
+    "pass": true
+  },
+  {
+    "id": "TC-A66",
+    "module": "Map editor",
+    "condition": "Vendor tries to save a map layout",
+    "expected": "HTTP 403",
+    "actual": "HTTP 403 - \"You do not have permission to do this.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A67",
+    "module": "Map editor",
+    "condition": "Upload a PNG venue picture",
+    "expected": "HTTP 200 and the picture is served",
+    "actual": "HTTP 200 - \"Map image uploaded.\"; GET picture = HTTP 200",
+    "pass": true
+  },
+  {
+    "id": "TC-A68",
+    "module": "Map editor",
+    "condition": "Upload a PDF as the venue picture",
+    "expected": "HTTP 400: images only",
+    "actual": "HTTP 400 - \"Map image must be a JPG, PNG, GIF or WEBP file.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A69",
+    "module": "Map editor",
+    "condition": "Remove the venue picture",
+    "expected": "HTTP 200",
+    "actual": "HTTP 200 - \"Map image removed.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A70",
+    "module": "Event management",
+    "condition": "Create an event dated 1 Jan 2020 (in the past)",
+    "expected": "HTTP 400",
+    "actual": "HTTP 400 - \"Event date cannot be in the past.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A71",
+    "module": "Event management",
+    "condition": "Create an event ending (8:00) before it starts (10:00)",
+    "expected": "HTTP 400",
+    "actual": "HTTP 400 - \"End time must be later than start time.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A72",
+    "module": "Event management",
+    "condition": "Create a valid event",
+    "expected": "HTTP 201",
+    "actual": "HTTP 201 - \"Event created.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A73",
+    "module": "Event management",
+    "condition": "Edit the event name, date, place and times",
+    "expected": "HTTP 200",
+    "actual": "HTTP 200 - \"Event updated.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A74",
+    "module": "Event management",
+    "condition": "Cancel the event, then check the public list and organizer list",
+    "expected": "Hidden from the public list; organizer sees it as cancelled",
+    "actual": "HTTP 200 - \"Event cancelled.\"; public list has it: false; organizer phase: cancelled",
+    "pass": true
+  },
+  {
+    "id": "TC-A75",
+    "module": "Event management",
+    "condition": "Delete the Weekend Family Bazaar, which has vendor applications",
+    "expected": "HTTP 409: cancel instead",
+    "actual": "HTTP 409 - \"This event has vendor applications. Cancel the event instead of deleting it.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A76",
+    "module": "Event management",
+    "condition": "Delete the empty test event",
+    "expected": "HTTP 200",
+    "actual": "HTTP 200 - \"Event deleted.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A77",
+    "module": "Vendor management",
+    "condition": "Search vendors for \"fruit\"",
+    "expected": "Exactly one result: Ahmad Fresh Fruit",
+    "actual": "1 result(s): Ahmad Fresh Fruit",
+    "pass": true
+  },
+  {
+    "id": "TC-A78",
+    "module": "Vendor management",
+    "condition": "Organizer edits the test vendor's name, then views the record",
+    "expected": "HTTP 200; name shows \"Renamed Vendor\" with application history",
+    "actual": "HTTP 200 - \"Vendor updated.\"; name now \"Renamed Vendor\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A79",
+    "module": "Vendor management",
+    "condition": "Delete the test vendor, then use their old login token",
+    "expected": "Delete HTTP 200; old token rejected with HTTP 401",
+    "actual": "HTTP 200 - \"Vendor account deleted. Their lots are free again.\"; old token: HTTP 401",
+    "pass": true
+  },
+  {
+    "id": "TC-A80",
+    "module": "Profile",
+    "condition": "Organizer edits own name and phone",
+    "expected": "HTTP 200 and the new name is saved",
+    "actual": "HTTP 200 - \"Profile saved.\"; name now \"Puan Aminah\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A81",
+    "module": "Profile",
+    "condition": "Vendor edits what they sell",
+    "expected": "HTTP 200",
+    "actual": "HTTP 200 - \"Profile saved.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A82",
+    "module": "Profile",
+    "condition": "Vendor saves profile with an empty name",
+    "expected": "HTTP 400",
+    "actual": "HTTP 400 - \"Missing required field(s): name.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A83",
+    "module": "Profile",
+    "condition": "Change password with the wrong current password",
+    "expected": "HTTP 400",
+    "actual": "HTTP 400 - \"Current password is wrong.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A84",
+    "module": "Profile",
+    "condition": "Change password correctly, then log in with the new password",
+    "expected": "HTTP 200; new password works",
+    "actual": "HTTP 200 - \"Password changed.\"; login with new password: success",
+    "pass": true
+  },
+  {
+    "id": "TC-A85",
+    "module": "Reports",
+    "condition": "Generate the report for today's PasarKita Night Market",
+    "expected": "Lots 4/14 taken; 2 verified payments totalling RM140; 4 vendors listed",
+    "actual": "lots 4/14; verified 2 = RM140; vendors listed 4",
+    "pass": true
+  },
+  {
+    "id": "TC-A86",
+    "module": "Reports",
+    "condition": "Print the same report",
+    "expected": "Returns the generated report plus a printed-at time",
+    "actual": "HTTP 200; printedAt present: true",
+    "pass": true
+  },
+  {
+    "id": "TC-A87",
+    "module": "Reports",
+    "condition": "Vendor tries to generate a report",
+    "expected": "HTTP 403",
+    "actual": "HTTP 403 - \"You do not have permission to do this.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A88",
+    "module": "Authentication",
+    "condition": "Register with a 7-character password (boundary: one below the 8-character minimum)",
+    "expected": "HTTP 400, account not created",
+    "actual": "HTTP 400 - \"Password must be at least 8 characters.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A89",
+    "module": "Authentication",
+    "condition": "Register with an exactly 8-character password (boundary: the minimum)",
+    "expected": "HTTP 201, account created",
+    "actual": "HTTP 201 - \"Registration successful. You can now log in.\"",
+    "pass": true
+  },
+  {
+    "id": "TC-A90",
+    "module": "Map editor",
+    "condition": "Save lot F1 at X 91% with width 9% (right edge exactly at the 100% boundary)",
+    "expected": "HTTP 200; lot saved at X 91%",
+    "actual": "HTTP 200 - \"Map saved.\"; saved X = 91%",
+    "pass": true
+  },
+  {
+    "id": "TC-A91",
+    "module": "Payment",
+    "condition": "Mei Ling (vendor3) views her payment status after the organizer rejected one receipt and verified the next",
+    "expected": "Shows one \"verified\" and one \"rejected\" payment",
+    "actual": "HTTP 200 - statuses: rejected, verified",
+    "pass": true
+  }
+]
