@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Register · PasarKita</title>
+<link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body>
+  <div class="auth-wrap">
+    <form class="auth-card wide" id="regForm">
+      <a class="brand" href="/index.html" id="brand"></a>
+      <h2 style="text-align:center">Register as a vendor</h2>
+      <div id="msg"></div>
+      <div class="form-grid">
+        <div><label for="username">Username *</label><input type="text" id="username" name="username" required minlength="3" maxlength="50" pattern="[A-Za-z0-9_.]+" title="Letters, numbers, _ or . only"></div>
+        <div><label for="password">Password *</label><input type="password" id="password" name="password" required minlength="8" autocomplete="new-password"><div class="hint">At least 8 characters</div></div>
+        <div class="full"><label for="name">Business / owner name *</label><input type="text" id="name" name="name" required maxlength="120"></div>
+        <div><label for="contactNumber">Phone number *</label><input type="text" id="contactNumber" name="contactNumber" required maxlength="30"></div>
+        <div><label for="email">Email</label><input type="email" id="email" name="email" maxlength="120"></div>
+        <div><label for="goodsType">What do you sell?</label><input type="text" id="goodsType" name="goodsType" maxlength="100" placeholder="e.g. Kuih, fresh fruit, crafts"></div>
+        <div><label for="stallSizeRequired">Stall size you need</label><input type="text" id="stallSizeRequired" name="stallSizeRequired" maxlength="50" placeholder="e.g. 10ft x 10ft"></div>
+      </div>
+      <div class="form-actions"><button class="btn btn-block" type="submit">Create account</button></div>
+      <p class="muted small" style="text-align:center;margin-top:14px">Already registered? <a href="/login.html">Log in</a></p>
+    </form>
+  </div>
+  <script src="/assets/js/sprites.js"></script>
+  <script src="/assets/js/api.js"></script>
+  <script>
+    document.getElementById('brand').innerHTML = `${Sprites.svg('nav_store', 'brand-icon')}<span>Pasar<b>Kita</b></span>`;
+    document.getElementById('regForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = e.target.querySelector('button[type=submit]');
+      await busy(btn, async () => {
+        try {
+          await api('/auth/register', { method: 'POST', body: formData(e.target) });
+          location.href = '/login.html?registered=1';
+        } catch (err) {
+          document.getElementById('msg').innerHTML = `<div class="notice notice-error">${esc(err.message)}</div>`;
+          window.scrollTo(0, 0);
+        }
+      });
+    });
+  </script>
+</body>
+</html>

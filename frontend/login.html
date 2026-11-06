@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Log in · PasarKita</title>
+<link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body>
+  <div class="auth-wrap">
+    <form class="auth-card" id="loginForm">
+      <a class="brand" href="/index.html" id="brand"></a>
+      <h2 style="text-align:center">Welcome back</h2>
+      <div id="msg"></div>
+      <label for="username">Username</label>
+      <input type="text" id="username" name="username" autocomplete="username" required>
+      <label for="password">Password</label>
+      <input type="password" id="password" name="password" autocomplete="current-password" required>
+      <div class="form-actions"><button class="btn btn-block" type="submit">Log in</button></div>
+      <p class="muted small" style="text-align:center;margin-top:14px">New vendor? <a href="/register.html">Create an account</a> · <a href="/index.html">View markets</a></p>
+      <div class="demo-logins">
+        <b>Demo accounts</b> (password <code>Password123!</code>)<br>
+        Organizer: <code>organizer1</code> · Vendors: <code>vendor1</code> to <code>vendor6</code>
+      </div>
+    </form>
+  </div>
+  <script src="/assets/js/sprites.js"></script>
+  <script src="/assets/js/api.js"></script>
+  <script>
+    document.getElementById('brand').innerHTML = `${Sprites.svg('nav_store', 'brand-icon')}<span>Pasar<b>Kita</b></span>`;
+    const msg = document.getElementById('msg');
+    if (qs('expired')) msg.innerHTML = '<div class="notice notice-warn">Your session ended. Please log in again.</div>';
+    if (qs('registered')) msg.innerHTML = '<div class="notice notice-info">Account created! You can log in now.</div>';
+    if (Auth.token() && !qs('expired')) location.href = Auth.home(Auth.role());
+
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = e.target.querySelector('button[type=submit]');
+      await busy(btn, async () => {
+        try {
+          const data = await api('/auth/login', { method: 'POST', body: formData(e.target) });
+          Auth.save(data.token, data.role, data.name);
+          location.href = Auth.home(data.role);
+        } catch (err) {
+          msg.innerHTML = `<div class="notice notice-error">${esc(err.message)}</div>`;
+        }
+      });
+    });
+  </script>
+</body>
+</html>

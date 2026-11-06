@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PasarKita · Pop-up markets near you</title>
+<link rel="stylesheet" href="/assets/css/style.css">
+</head>
+<body>
+  <header class="public-top">
+    <a class="brand" href="/index.html" id="brand"></a>
+    <div class="row" id="topActions">
+      <a class="btn btn-ghost btn-sm" href="/register.html">Register as vendor</a>
+      <a class="btn btn-accent btn-sm" href="/login.html">Log in</a>
+    </div>
+  </header>
+
+  <section class="hero">
+    <h1>Find your next <b>pop-up market</b></h1>
+    <p>See what's happening today and what's coming up, explore the stall map, and find your favourite vendors.</p>
+  </section>
+
+  <main class="public-content">
+    <div class="event-strip" id="eventStrip"></div>
+    <div class="board">
+      <section class="board-map">
+        <div class="card">
+          <div class="map-title">
+            <div><h2 id="mapTitle">Stall map</h2><div class="muted small" id="mapMeta"></div></div>
+          </div>
+          <div id="map"></div>
+          <div class="legend" id="legend"></div>
+        </div>
+      </section>
+      <aside class="panel">
+        <div class="card" id="lotPanel"><h3>Lot details</h3><p class="muted">Click a lot on the map to see who's there.</p></div>
+        <div class="card"><h3>Lots by zone</h3><div id="zones"></div></div>
+      </aside>
+    </div>
+  </main>
+
+  <script src="/assets/js/sprites.js"></script>
+  <script src="/assets/js/api.js"></script>
+  <script src="/assets/js/map.js"></script>
+  <script>
+    document.getElementById('brand').innerHTML = `${Sprites.svg('nav_store', 'brand-icon')}<span>Pasar<b>Kita</b></span>`;
+    if (Auth.token()) {
+      document.getElementById('topActions').innerHTML =
+        `<a class="btn btn-accent btn-sm" href="${Auth.home(Auth.role())}">Go to my dashboard</a>`;
+    }
+
+    let events = [];
+    let current = null;
+    const map = new PixelMap(document.getElementById('map'), { onLotClick: showLot });
+    renderLegend(document.getElementById('legend'), ['available', 'pending', 'taken']);
+
+    async function load() {
+      try {
+        events = await api('/events');
+      } catch (e) {
+        document.getElementById('eventStrip').innerHTML = `<div class="notice notice-error">${esc(e.message)}</div>`;
+        return;
+      }
+      renderEventCards(document.getElementById('eventStrip'), events, null, pick);
+      const first = pickDefaultEvent(events);
+      if (first) pick(first);
+      else document.getElementById('map').innerHTML = '<div class="empty-card">No markets scheduled yet. Check back soon!</div>';
+    }
+
+    async function pick(id) {
+      renderEventCards(document.getElementById('eventStrip'), events, id, pick);
+      const data = await api(`/events/${id}/map`);
+      current = data;
+      const e = data.event;
+      document.getElementById('mapTitle').textContent = e.name;
+      document.getElementById('mapMeta').textContent = `${fmtDate(e.event_date)} · ${fmtTime(e.start_time)}–${fmtTime(e.end_time)} · ${e.location}`;
+      map.setData(data);
+      renderZoneList(document.getElementById('zones'), data.lots, { onClick: showLot, showVendor: true });
+      document.getElementById('lotPanel').innerHTML = '<h3>Lot details</h3><p class="muted">Click a lot on the map to see who\'s there.</p>';
+    }
+
+    function showLot(lot) {
+      map.highlightLot(lot.lot_id);
+      const st = defaultLotState(lot);
+      const e = current.event;
+      let extra = '';
+      if (lot.vendor_id) {
+        extra = `<p>Vendor: <b>${esc(lot.vendor_name)}</b><br><span class="muted">${esc(lot.vendor_goods || '')}</span></p>`;
+      } else if (e.phase === 'upcoming') {
+        extra = `<p class="muted">This lot is open for applications.</p>
+          <a class="btn btn-block" href="${Auth.role() === 'vendor' ? `/vendor/apply.html?lot=${lot.lot_id}` : '/login.html'}">Vendor? Apply for this lot</a>`;
+      } else {
+        extra = '<p class="muted">This lot is empty today.</p>';
+      }
+      document.getElementById('lotPanel').innerHTML = `
+        <div class="lot-head"><span class="lot-big st-${st}">${esc(lot.lot_number)}</span>
+          <div><b>${esc(lot.zone || 'Lot')}</b><br><span class="muted small">${LOT_STATE_LABELS[st]}</span></div></div>
+        <dl class="kv"><dt>Size</dt><dd>${esc(lot.size_label || '-')}</dd><dt>Price</dt><dd>${money(lot.price)}</dd></dl>
+        ${extra}`;
+    }
+
+    load();
+  </script>
+</body>
+</html>
