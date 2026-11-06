@@ -1,0 +1,7 @@
+node_modules/
+.env
+uploads/receipts/*
+uploads/maps/*
+!uploads/receipts/.gitkeep
+!uploads/maps/.gitkeep
+tests/api-results.json
